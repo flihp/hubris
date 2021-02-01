@@ -1,0 +1,15 @@
+[package]
+name = "drv-lpc55-rng-core"
+version = "0.1.0"
+edition = "2018"
+
+[features]
+default = ["rng"]
+rng = ["chacha20/rng"]
+
+[dependencies]
+zerocopy = "0.3.0"
+lpc55-pac = "0.3.0"
+num-traits = { version = "0.2.12", default-features = false }
+rand_core = { version = "0.5.0", default-features = false }
+chacha20 = "0.6.0"

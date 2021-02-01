@@ -9,7 +9,7 @@ dependencies = [
  "bitflags",
  "byteorder",
  "serde",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -243,6 +243,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "chacha20"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed8738f14471a99f0e316c327e68fc82a3611cc2895fcb604b89eedaf8f39d95"
+dependencies = [
+ "cipher",
+ "rand_core 0.5.1",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -250,6 +260,15 @@ checksum = "670ad68c9088c2a963aaa298cb369688cf3f9465ce5e2d4ca10e6e0098a1ce73"
 dependencies = [
  "num-integer",
  "num-traits",
+]
+
+[[package]]
+name = "cipher"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12f8e7987cbd042a63249497f41aed09f8e65add917ea6566effbc56578d6801"
+dependencies = [
+ "generic-array",
 ]
 
 [[package]]
@@ -373,7 +392,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f83bd3bb4314701c568e340cd8cf78c975aa0ca79e03d3f6d1677d5b0c9c0c03"
 dependencies = [
  "generic-array",
- "rand_core",
+ "rand_core 0.6.3",
  "subtle",
  "zeroize",
 ]
@@ -536,7 +555,7 @@ dependencies = [
  "idol",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -555,7 +574,7 @@ dependencies = [
  "num-traits",
  "stm32h7",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -566,7 +585,7 @@ dependencies = [
  "idol",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -595,7 +614,7 @@ dependencies = [
  "serde",
  "serde_json",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -605,7 +624,7 @@ dependencies = [
  "num-traits",
  "ringbuf",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -619,7 +638,7 @@ dependencies = [
  "pmbus",
  "ringbuf",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -651,7 +670,7 @@ dependencies = [
  "cfg-if 0.1.10",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -663,18 +682,31 @@ dependencies = [
  "lpc55-pac",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
 name = "drv-lpc55-rng"
 version = "0.1.0"
 dependencies = [
+ "drv-lpc55-rng-core",
  "drv-lpc55-syscon-api",
  "lpc55-pac",
  "num-traits",
+ "rand_core 0.5.1",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
+]
+
+[[package]]
+name = "drv-lpc55-rng-core"
+version = "0.1.0"
+dependencies = [
+ "chacha20",
+ "lpc55-pac",
+ "num-traits",
+ "rand_core 0.5.1",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -685,7 +717,7 @@ dependencies = [
  "lpc55-pac",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -699,7 +731,7 @@ dependencies = [
  "num-traits",
  "ringbuf",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -710,7 +742,7 @@ dependencies = [
  "lpc55-pac",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -719,7 +751,7 @@ version = "0.1.0"
 dependencies = [
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -730,7 +762,7 @@ dependencies = [
  "drv-lpc55-syscon-api",
  "lpc55-pac",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -739,7 +771,7 @@ version = "0.1.0"
 dependencies = [
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -749,7 +781,7 @@ dependencies = [
  "drv-onewire",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -760,7 +792,7 @@ dependencies = [
  "idol",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -783,7 +815,7 @@ dependencies = [
  "num-traits",
  "ringbuf",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -794,7 +826,7 @@ dependencies = [
  "idol",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -805,7 +837,7 @@ dependencies = [
  "stm32f3",
  "stm32f4",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -816,7 +848,7 @@ dependencies = [
  "stm32f3",
  "stm32f4",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -839,7 +871,7 @@ dependencies = [
  "num-traits",
  "stm32h7",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -850,7 +882,7 @@ dependencies = [
  "idol",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -866,7 +898,7 @@ dependencies = [
  "ringbuf",
  "stm32h7",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -896,7 +928,7 @@ dependencies = [
  "stm32h7",
  "userlib",
  "vcell",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -909,7 +941,7 @@ dependencies = [
  "num-traits",
  "stm32h7",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -920,7 +952,7 @@ dependencies = [
  "idol",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -931,7 +963,7 @@ dependencies = [
  "ringbuf",
  "stm32h7",
  "vcell",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -957,7 +989,7 @@ dependencies = [
  "stm32h7",
  "syn",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -979,7 +1011,7 @@ dependencies = [
  "num-traits",
  "stm32h7",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -997,7 +1029,7 @@ dependencies = [
  "stm32f3",
  "stm32f4",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -1008,7 +1040,7 @@ dependencies = [
  "idol",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -1040,7 +1072,7 @@ dependencies = [
  "generic-array",
  "group",
  "pkcs8",
- "rand_core",
+ "rand_core 0.6.3",
  "subtle",
  "zeroize",
 ]
@@ -1067,7 +1099,7 @@ version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0f40b2dcd8bc322217a5f6559ae5f9e9d1de202a2ecee2e9eafcbece7562a4f"
 dependencies = [
- "rand_core",
+ "rand_core 0.6.3",
  "subtle",
 ]
 
@@ -1230,7 +1262,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c363a5301b8f153d80747126a04b3c82073b9fe3130571a9d170cacdeaf7912"
 dependencies = [
  "ff",
- "rand_core",
+ "rand_core 0.6.3",
  "subtle",
 ]
 
@@ -1330,7 +1362,7 @@ dependencies = [
  "num-traits",
  "serde",
  "ssmarshal",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -1357,7 +1389,7 @@ version = "0.1.0"
 source = "git+https://github.com/oxidecomputer/idolatry.git#a3dfa36f18a122cf645c9a5aeea846130b0eb7b3"
 dependencies = [
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -1392,7 +1424,7 @@ dependencies = [
  "serde",
  "ssmarshal",
  "unwrap-lite",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -1442,7 +1474,7 @@ dependencies = [
  "cfg-if 0.1.10",
  "proc-macro2",
  "quote",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -1453,6 +1485,15 @@ checksum = "eee47591d506a22d56bc591abb955176b1ad3c22122c2395a69e426ea76e25ab"
 dependencies = [
  "cortex-m",
  "vcell",
+]
+
+[[package]]
+name = "lpc55-rng-api"
+version = "0.1.0"
+dependencies = [
+ "rand_core 0.5.1",
+ "userlib",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -1934,7 +1975,7 @@ checksum = "2e7573632e6454cf6b99d7aac4ccca54be06da05aca2ef7423d22d27d4d4bcd8"
 dependencies = [
  "libc",
  "rand_chacha",
- "rand_core",
+ "rand_core 0.6.3",
  "rand_hc",
 ]
 
@@ -1945,8 +1986,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
 dependencies = [
  "ppv-lite86",
- "rand_core",
+ "rand_core 0.6.3",
 ]
+
+[[package]]
+name = "rand_core"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90bde5296fc891b0cef12a6d03ddccc162ce7b2aff54160af9338f8d40df6d19"
 
 [[package]]
 name = "rand_core"
@@ -1963,7 +2010,7 @@ version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d51e9f596de227fda2ea6c84607f5558e196eeaf43c986b724ba4fb8fdf497e7"
 dependencies = [
- "rand_core",
+ "rand_core 0.6.3",
 ]
 
 [[package]]
@@ -2251,7 +2298,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2807892cfa58e081aa1f1111391c7a0649d4fa127a4ffbe34bcbfb35a1171a4"
 dependencies = [
  "digest",
- "rand_core",
+ "rand_core 0.6.3",
 ]
 
 [[package]]
@@ -2341,7 +2388,7 @@ dependencies = [
  "panic-halt",
  "panic-semihosting",
  "sha2",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -2474,7 +2521,7 @@ dependencies = [
  "ringbuf",
  "serde",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -2495,7 +2542,7 @@ dependencies = [
  "num-traits",
  "ringbuf",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -2521,7 +2568,7 @@ dependencies = [
  "syn",
  "task-net-api",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -2534,7 +2581,7 @@ dependencies = [
  "smoltcp",
  "ssmarshal",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -2571,7 +2618,7 @@ dependencies = [
  "ringbuf",
  "task-sensor-api",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -2591,7 +2638,7 @@ dependencies = [
  "ringbuf",
  "task-sensor-api",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -2603,7 +2650,7 @@ dependencies = [
  "idol",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -2662,7 +2709,7 @@ dependencies = [
  "task-sensor-api",
  "task-thermal-api",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -2673,7 +2720,7 @@ dependencies = [
  "idol",
  "num-traits",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -2713,7 +2760,7 @@ dependencies = [
  "num-traits",
  "test-api",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -2725,7 +2772,7 @@ dependencies = [
  "num-traits",
  "test-api",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -2738,7 +2785,7 @@ dependencies = [
  "num-traits",
  "test-api",
  "userlib",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -2907,7 +2954,7 @@ dependencies = [
  "serde",
  "ssmarshal",
  "unwrap-lite",
- "zerocopy",
+ "zerocopy 0.6.1",
 ]
 
 [[package]]
@@ -3049,12 +3096,33 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6580539ad917b7c026220c4b3f2c08d52ce54d6ce0dc491e66002e35388fab46"
+dependencies = [
+ "byteorder",
+ "zerocopy-derive 0.2.0",
+]
+
+[[package]]
+name = "zerocopy"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "332f188cc1bcf1fe1064b8c58d150f497e697f49774aa846f2dc949d9a25f236"
 dependencies = [
  "byteorder",
- "zerocopy-derive",
+ "zerocopy-derive 0.3.1",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d498dbd1fd7beb83c86709ae1c33ca50942889473473d287d56ce4770a18edfb"
+dependencies = [
+ "proc-macro2",
+ "syn",
+ "synstructure",
 ]
 
 [[package]]

@@ -1,0 +1,15 @@
+[package]
+name = "lpc55-rng-api"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+userlib = {path = "../../sys/userlib"}
+zerocopy = "0.3.0"
+rand_core = { version = "0.5.0", default-features = false }
+
+# This section is here to discourage RLS/rust-analyzer from doing test builds,
+# since test builds don't work for cross compilation.
+[lib]
+test = false
+bench = false
