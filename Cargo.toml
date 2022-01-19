@@ -50,6 +50,7 @@ members = [
     "task/udpbroadcast",
     "task/udpecho",
     "task/vsc7448",
+    "task/ent-eat",
 
     "drv/stm32fx-rcc",
     "drv/stm32fx-usart",

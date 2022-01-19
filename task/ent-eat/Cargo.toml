@@ -1,0 +1,16 @@
+[package]
+name = "task-ent-eat"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+abi = { path = "../../sys/abi" }
+drv-rng-api = { path = "../../drv/rng-api", features = ["custom-getrandom"] }
+userlib = { path = "../../sys/userlib", features = ["panic-messages"] }
+getrandom = { version = "0.2", default-features = false }
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+[[bin]]
+name = "task-ent-eat"
+test = false
+bench = false
