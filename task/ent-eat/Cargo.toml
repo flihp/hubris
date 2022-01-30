@@ -8,6 +8,7 @@ abi = { path = "../../sys/abi" }
 drv-rng-api = { path = "../../drv/rng-api", features = ["custom-getrandom"] }
 userlib = { path = "../../sys/userlib", features = ["panic-messages"] }
 getrandom = { version = "0.2", default-features = false }
+ringbuf = { path = "../../lib/ringbuf" }
 
 [[bin]]
 name = "task-ent-eat"

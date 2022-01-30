@@ -647,6 +647,7 @@ dependencies = [
  "drv-rng-api",
  "lpc55-pac",
  "num-traits",
+ "ringbuf",
  "userlib",
  "zerocopy",
 ]
@@ -2344,6 +2345,7 @@ dependencies = [
  "abi",
  "drv-rng-api",
  "getrandom",
+ "ringbuf",
  "userlib",
 ]
 
