@@ -19,6 +19,9 @@ pub enum RngError {
     NoData,
     ClockError,
     SeedError,
+    TimeoutChi2Min,
+    TimeoutChi2Gt4,
+    TimeoutRefreshCnt,
 }
 
 impl From<RngError> for u16 {
