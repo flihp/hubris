@@ -17,6 +17,9 @@ use userlib::{sys_send, FromPrimitive};
 pub enum RngError {
     BadArg,
     PoweredOff,
+    TimeoutChi2Min,
+    TimeoutChi2Gt4,
+    TimeoutRefreshCnt,
 }
 
 impl From<RngError> for u16 {
