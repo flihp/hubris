@@ -146,7 +146,7 @@ priority = 2
 requires = {flash = 16384, ram = 4096}
 uses = ["rng", "pmc"]
 start = true
-stacksize = 2000
+stacksize = 2296
 task-slots = ["syscon_driver"]
 
 [tasks.spi0_driver]

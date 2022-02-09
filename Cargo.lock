@@ -730,6 +730,7 @@ dependencies = [
  "num-traits",
  "rand_chacha",
  "rand_core",
+ "ringbuf",
  "userlib",
  "zerocopy",
 ]

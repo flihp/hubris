@@ -13,6 +13,7 @@ drv-rng-api = {path = "../rng-api"}
 rand_chacha = {version = "0.3", default-features = false}
 rand_core = { version = "0.6" }
 idol-runtime = {git = "https://github.com/oxidecomputer/idolatry.git"}
+ringbuf = { path = "../../lib/ringbuf" }
 
 [build-dependencies]
 idol = {git = "https://github.com/oxidecomputer/idolatry.git"}

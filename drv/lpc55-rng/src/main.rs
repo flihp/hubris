@@ -15,11 +15,27 @@ use drv_rng_api::RngError;
 use idol_runtime::{ClientError, RequestError};
 use rand_chacha::ChaCha20Rng;
 use rand_core::{impls, Error, RngCore, SeedableRng};
+use ringbuf::*;
 use userlib::*;
 
 use lpc55_pac as device;
 
 task_slot!(SYSCON, syscon_driver);
+
+#[derive(Copy, Clone, PartialEq)]
+enum Trace {
+    Read,
+    Reseed,
+    UntilReseed(usize),
+    Generate(usize),
+    Fill(usize),
+    FillStep,
+    FillRemain(usize),
+    FillDoneCnt(usize),
+    None,
+}
+
+ringbuf!(Trace, 64, Trace::None);
 
 struct Lpc55Rng {
     pmc: &'static lpc55_pac::pmc::RegisterBlock,
@@ -117,6 +133,7 @@ impl Lpc55Rng {
         if self.pmc.pdruncfg0.read().pden_rng().is_poweredoff() {
             return Err(RngError::PoweredOff);
         }
+        ringbuf_entry!(Trace::Read);
 
         // 1. Keep Clocks CHI computing active.
         // 2. Wait for COUNTER_VAL.REFRESH_CNT to become 31 to refill fresh entropy
@@ -262,11 +279,14 @@ impl idl::InOrderRngImpl for Lpc55RngServer {
         _: &userlib::RecvMessage,
         dest: idol_runtime::Leased<idol_runtime::W, [u8]>,
     ) -> Result<usize, RequestError<RngError>> {
+        ringbuf_entry!(Trace::Fill(dest.len()));
+
         let mut cnt = 0;
         const STEP: usize = size_of::<u32>();
         let mut buf = [0u8; STEP];
         // fill in multiples of STEP / RNG register size
         for _ in 0..(dest.len() / STEP) {
+            ringbuf_entry!(Trace::FillStep);
             self.0
                 .try_fill_bytes(&mut buf)
                 .map_err(|e| RequestError::Runtime(RngError::from(e)))?;
@@ -280,6 +300,7 @@ impl idl::InOrderRngImpl for Lpc55RngServer {
             panic!("RNG state machine bork");
         }
         if remain > 0 {
+            ringbuf_entry!(Trace::FillRemain(remain));
             self.0
                 .try_fill_bytes(&mut buf)
                 .map_err(|e| RequestError::Runtime(RngError::from(e)))?;
@@ -287,6 +308,7 @@ impl idl::InOrderRngImpl for Lpc55RngServer {
                 .map_err(|_| RequestError::Fail(ClientError::WentAway))?;
             cnt += remain;
         }
+        ringbuf_entry!(Trace::FillDoneCnt(cnt));
         Ok(cnt)
     }
 }
