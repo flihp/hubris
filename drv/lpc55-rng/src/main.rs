@@ -15,11 +15,33 @@ use drv_rng_api::RngError;
 use idol_runtime::{ClientError, RequestError};
 use rand_chacha::ChaCha20Rng;
 use rand_core::{impls, Error, RngCore, SeedableRng};
+use ringbuf::*;
 use userlib::*;
 
 use lpc55_pac as device;
 
 task_slot!(SYSCON, syscon_driver);
+
+#[derive(Copy, Clone, PartialEq)]
+enum Trace {
+    Read,
+    ReadDone,
+    ReadRefreshCntDone,
+    ReadRefreshCntErr,
+    ReadMaxChi2Done,
+    ReadMaxChi2Err,
+    ReadMaxChi2Sleep(u8),
+    Reseed,
+    ReseedDone,
+    UntilReseed(usize),
+    Fill(usize),
+    FillStep,
+    FillRemain(usize),
+    FillDoneCnt(usize),
+    None,
+}
+
+ringbuf!(Trace, 64, Trace::None);
 
 struct Lpc55Rng {
     rng: &'static lpc55_pac::rng::RegisterBlock,
@@ -113,11 +135,13 @@ where
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
         let num_bytes = dest.len();
         if num_bytes >= self.bytes_until_reseed || num_bytes >= self.threshold {
+            ringbuf_entry!(Trace::Reseed);
             // try_trait_v2 is still experimental
             self.inner = match T::from_rng(&mut self.reseeder) {
                 Ok(rng) => rng,
                 Err(e) => return Err(e),
             };
+            ringbuf_entry!(Trace::ReseedDone);
             self.bytes_until_reseed = self.threshold;
         } else {
             self.bytes_until_reseed -= num_bytes;
@@ -142,11 +166,14 @@ impl idl::InOrderRngImpl for Lpc55RngServer {
         _: &userlib::RecvMessage,
         dest: idol_runtime::Leased<idol_runtime::W, [u8]>,
     ) -> Result<usize, RequestError<RngError>> {
+        ringbuf_entry!(Trace::Fill(dest.len()));
+
         let mut cnt = 0;
         const STEP: usize = size_of::<u32>();
         let mut buf = [0u8; STEP];
         // fill in multiples of STEP / RNG register size
         for _ in 0..(dest.len() / STEP) {
+            ringbuf_entry!(Trace::FillStep);
             self.0
                 .try_fill_bytes(&mut buf)
                 .map_err(|e| RngError::from(e))?;
@@ -158,6 +185,7 @@ impl idl::InOrderRngImpl for Lpc55RngServer {
         let remain = dest.len() - cnt;
         assert!(remain < STEP);
         if remain > 0 {
+            ringbuf_entry!(Trace::FillRemain(remain));
             self.0
                 .try_fill_bytes(&mut buf)
                 .map_err(|e| RngError::from(e))?;
@@ -165,6 +193,7 @@ impl idl::InOrderRngImpl for Lpc55RngServer {
                 .map_err(|_| RequestError::Fail(ClientError::WentAway))?;
             cnt += remain;
         }
+        ringbuf_entry!(Trace::FillDoneCnt(cnt));
         Ok(cnt)
     }
 }
