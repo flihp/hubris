@@ -16,11 +16,27 @@ use idol_runtime::{ClientError, RequestError};
 use rand_chacha::ChaCha20Core;
 use rand_core::block::{BlockRng, BlockRngCore};
 use rand_core::{RngCore, SeedableRng};
+use ringbuf::*;
 use userlib::*;
 
 use lpc55_pac as device;
 
 task_slot!(SYSCON, syscon_driver);
+
+#[derive(Copy, Clone, PartialEq)]
+enum Trace {
+    Read,
+    Reseed,
+    UntilReseed(usize),
+    Generate(usize),
+    Fill(usize),
+    FillStep,
+    FillRemain(usize),
+    FillDoneCnt(usize),
+    None,
+}
+
+ringbuf!(Trace, 64, Trace::None);
 
 struct Lpc55BlockRngCore {
     rng: &'static lpc55_pac::rng::RegisterBlock,
@@ -118,6 +134,7 @@ impl Lpc55BlockRngCore {
         if self.pmc.pdruncfg0.read().pden_rng().is_poweredoff() {
             return Err(RngError::PoweredOff);
         }
+        ringbuf_entry!(Trace::Read);
 
         // 1. Keep Clocks CHI computing active.
         // 2. Wait for COUNTER_VAL.REFRESH_CNT to become 31 to refill fresh entropy
@@ -177,7 +194,10 @@ impl BlockRngCore for ReseedingRngCore {
 
     fn generate(&mut self, results: &mut Self::Results) {
         let num_bytes = results.as_ref().len() * size_of::<Self::Item>();
+        ringbuf_entry!(Trace::Generate(num_bytes));
+        ringbuf_entry!(Trace::UntilReseed(self.bytes_until_reseed));
         if num_bytes >= self.bytes_until_reseed || num_bytes >= self.threshold {
+            ringbuf_entry!(Trace::Reseed);
             self.inner = ChaCha20Core::from_rng(&mut self.reseeder)
                 .expect("Failed to reseed RNG.");
             self.bytes_until_reseed = self.threshold;
@@ -224,10 +244,13 @@ impl idl::InOrderRngImpl for Lpc55RngServer {
         _: &userlib::RecvMessage,
         dest: idol_runtime::Leased<idol_runtime::W, [u8]>,
     ) -> Result<usize, RequestError<RngError>> {
+        ringbuf_entry!(Trace::Fill(dest.len()));
+
         let mut cnt = 0;
         const STEP: usize = size_of::<u32>();
         // fill in multiples of STEP / RNG register size
         for _ in 0..(dest.len() / STEP) {
+            ringbuf_entry!(Trace::FillStep);
             let number = self.0.next_u32();
             dest.write_range(cnt..cnt + STEP, &number.to_ne_bytes()[0..STEP])
                 .map_err(|_| RequestError::Fail(ClientError::WentAway))?;
@@ -239,11 +262,13 @@ impl idl::InOrderRngImpl for Lpc55RngServer {
             panic!("RNG state machine bork");
         }
         if remain > 0 {
+            ringbuf_entry!(Trace::FillRemain(remain));
             let ent = self.0.next_u32().to_ne_bytes();
             dest.write_range(dest.len() - remain..dest.len(), &ent[..remain])
                 .map_err(|_| RequestError::Fail(ClientError::WentAway))?;
             cnt += remain;
         }
+        ringbuf_entry!(Trace::FillDoneCnt(cnt));
         Ok(cnt)
     }
 }
