@@ -728,6 +728,7 @@ dependencies = [
  "idol-runtime",
  "lpc55-pac",
  "num-traits",
+ "rand_chacha",
  "rand_core",
  "userlib",
  "zerocopy",
