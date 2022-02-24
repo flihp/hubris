@@ -430,3 +430,50 @@ pub(crate) fn qspi_sector_erase(
     func_err(server.sector_erase(addr))?;
     Ok(0)
 }
+
+// TODO: fml
+#[derive(Copy, Clone, PartialEq)]
+enum Trace {
+    FML,
+    None,
+}
+use ringbuf::*;
+ringbuf!(Trace, 64, Trace::None);
+
+// TODO: this can be passed through humility
+#[cfg(feature = "rng")]
+userlib::task_slot!(RNG, rng_driver);
+
+#[cfg(feature = "rng")]
+pub(crate) fn rng_fill(
+    stack: &[Option<u32>],
+    _data: &[u8],
+    rval: &mut [u8],
+) -> Result<usize, Failure> {
+    use drv_rng_api::Rng;
+
+    ringbuf_entry!(Trace::FML);
+    // 1) figure out how many bytes the caller wants
+    // this will come off the stack as a usize
+    // NOTE:consider limiting how many bytes can be got in a single call
+    // there may be a practical limit in rval.len()?
+    if stack.len() < 1 {
+        return Err(Failure::Fault(Fault::MissingParameters));
+    }
+    if stack.len() > 1 {
+        return Err(Failure::Fault(Fault::BadParameter(2)));
+    }
+
+    let frame = &stack[stack.len() - 1..];
+    let count =
+        frame[0].ok_or(Failure::Fault(Fault::MissingParameters))? as usize;
+    if count > rval.len() {
+        return Err(Failure::Fault(Fault::AccessOutOfBounds));
+    }
+
+    // 2) call Rand::fill to get bytes for caller
+    // 3) return through rval
+    // NOTE: can I just write the rand data to rval or does it need structure
+    func_err(Rng::from(RNG.get_task_id()).fill(&mut rval[0..count]))?;
+    Ok(count)
+}
