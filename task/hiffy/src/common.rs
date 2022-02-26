@@ -549,6 +549,25 @@ use userlib::task_slot;
 task_slot!(RNG, rng_driver);
 
 #[cfg(feature = "rng")]
+use ringbuf::*;
+
+#[cfg(feature = "rng")]
+use drv_rng_api::RngError;
+
+#[cfg(feature = "rng")]
+#[derive(Copy, Clone, PartialEq)]
+enum Trace {
+    Count(usize),
+    RngApiError(u32),
+    LocalError(Failure),
+    RngResult(usize),
+    None,
+}
+
+#[cfg(feature = "rng")]
+ringbuf!(Trace, 32, Trace::None);
+
+#[cfg(feature = "rng")]
 pub(crate) fn rng_fill(
     stack: &[Option<u32>],
     _data: &[u8],
@@ -557,19 +576,31 @@ pub(crate) fn rng_fill(
     use drv_rng_api::Rng;
 
     if stack.len() < 1 {
+        ringbuf_entry!(Trace::LocalError(Failure::Fault(
+            Fault::MissingParameters
+        )));
+
         return Err(Failure::Fault(Fault::MissingParameters));
     }
     if stack.len() > 1 {
+        ringbuf_entry!(Trace::LocalError(Failure::Fault(Fault::BadParameter(
+            2
+        ))));
         return Err(Failure::Fault(Fault::BadParameter(2)));
     }
 
     let frame = &stack[stack.len() - 1..];
     let count =
         frame[0].ok_or(Failure::Fault(Fault::MissingParameters))? as usize;
+    ringbuf_entry!(Trace::Count(count));
     if count > rval.len() {
+        ringbuf_entry!(Trace::LocalError(Failure::Fault(
+            Fault::AccessOutOfBounds
+        )));
         return Err(Failure::Fault(Fault::AccessOutOfBounds));
     }
 
     func_err(Rng::from(RNG.get_task_id()).fill(&mut rval[0..count]))?;
+
     Ok(count)
 }
