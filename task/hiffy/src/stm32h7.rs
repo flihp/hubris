@@ -10,7 +10,7 @@ use crate::common::{
 use crate::common::{spi_read, spi_write};
 use hif::*;
 use hubris_num_tasks::Task;
-use ringbuf::*;
+//use ringbuf::*;
 #[cfg(any(feature = "spi", feature = "gpio", feature = "i2c"))]
 use userlib::*;
 
@@ -45,7 +45,7 @@ enum Trace {
     None,
 }
 
-ringbuf!(Trace, 64, Trace::None);
+//ringbuf!(STM, Trace, 64, Trace::None);
 
 pub struct Buffer(u8);
 //
@@ -412,7 +412,7 @@ fn gpio_input(
         None => return Err(Failure::Fault(Fault::EmptyParameter(0))),
     };
 
-    ringbuf_entry!(Trace::GpioInput(port));
+    //ringbuf_entry!(STM, Trace::GpioInput(port));
 
     match gpio.gpio_read_input(port) {
         Ok(input) => {
@@ -532,10 +532,10 @@ fn gpio_configure(
     let task = SYS.get_task_id();
     let gpio = drv_stm32xx_sys_api::Sys::from(task);
 
-    #[rustfmt::skip]
-    ringbuf_entry!(
-        Trace::GpioConfigure(port, mask, mode, output_type, speed, pull, af)
-    );
+    //#[rustfmt::skip]
+    //ringbuf_entry!(STM,
+    //    Trace::GpioConfigure(port, mask, mode, output_type, speed, pull, af)
+    //);
 
     match gpio.gpio_configure(port, mask, mode, output_type, speed, pull, af) {
         Ok(_) => Ok(0),
@@ -602,13 +602,13 @@ pub(crate) static HIFFY_FUNCS: &[Function] = &[
 static HIFFY_FUNCTIONS: Option<&Functions> = None;
 
 pub(crate) fn trace_execute(offset: usize, op: hif::Op) {
-    ringbuf_entry!(Trace::Execute((offset, op)));
+    // ringbuf_entry!(STM, Trace::Execute((offset, op)));
 }
 
 pub(crate) fn trace_success() {
-    ringbuf_entry!(Trace::Success);
+    // ringbuf_entry!(STM, Trace::Success);
 }
 
 pub(crate) fn trace_failure(f: hif::Failure) {
-    ringbuf_entry!(Trace::Failure(f));
+    // ringbuf_entry!(STM, Trace::Failure(f));
 }
