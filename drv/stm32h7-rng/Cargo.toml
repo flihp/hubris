@@ -6,8 +6,10 @@ edition = "2021"
 [dependencies]
 drv-rng-api = { path = "../rng-api" }
 drv-stm32xx-sys-api = { path = "../stm32xx-sys-api" }
+drv-user-leds-api = {path = "../../drv/user-leds-api"}
 idol-runtime = { git = "https://github.com/oxidecomputer/idolatry.git" }
 num-traits = { version = "0.2.14", default-features = false }
+ringbuf = { path = "../../lib/ringbuf" }
 stm32h7 = { version = "0.13", default-features = false }
 userlib = { path = "../../sys/userlib", features = ["panic-messages"] }
 zerocopy = { version = "0.6" }

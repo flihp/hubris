@@ -992,9 +992,11 @@ version = "0.1.0"
 dependencies = [
  "drv-rng-api",
  "drv-stm32xx-sys-api",
+ "drv-user-leds-api",
  "idol",
  "idol-runtime",
  "num-traits",
+ "ringbuf",
  "stm32h7 0.13.0",
  "userlib",
  "zerocopy",
