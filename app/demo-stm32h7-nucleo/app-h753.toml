@@ -200,8 +200,8 @@ features = ["h753"]
 path = "../../drv/stm32h7-rng"
 priority = 2
 name = "drv-stm32h7-rng"
-requires = {flash = 8192, ram = 512}
-stacksize = 256
+requires = {flash = 8192, ram = 2048}
+stacksize = 512
 start = true
 task-slots = ["sys", "user_leds"]
 uses = ["rng"]

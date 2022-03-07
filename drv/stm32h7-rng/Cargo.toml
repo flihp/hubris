@@ -9,6 +9,7 @@ drv-stm32xx-sys-api = { path = "../stm32xx-sys-api" }
 drv-user-leds-api = { path = "../../drv/user-leds-api" }
 idol-runtime = { git = "https://github.com/oxidecomputer/idolatry.git" }
 num-traits = { version = "0.2.12", default-features = false }
+ringbuf = { path = "../../lib/ringbuf" }
 stm32h7 = { version = "0.13", default-features = false }
 userlib = { path = "../../sys/userlib", features = ["panic-messages"] }
 zerocopy = "0.6.1"

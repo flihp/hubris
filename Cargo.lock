@@ -996,6 +996,7 @@ dependencies = [
  "idol",
  "idol-runtime",
  "num-traits",
+ "ringbuf",
  "stm32h7 0.13.0",
  "userlib",
  "zerocopy",
