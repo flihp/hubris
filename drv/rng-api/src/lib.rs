@@ -13,10 +13,13 @@ pub use rand_core::{Error, RngCore};
 use userlib::{sys_send, FromPrimitive};
 
 #[repr(u32)]
-#[derive(Copy, Clone, Debug, FromPrimitive)]
+#[derive(Copy, Clone, Debug, FromPrimitive, PartialEq)]
 pub enum RngError {
     BadArg,
     PoweredOff,
+    NoData,
+    ClockError,
+    SeedError,
     TimeoutChi2Min,
     TimeoutChi2Gt4,
     TimeoutRefreshCnt,
