@@ -2861,6 +2861,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "task-rng-usart-br"
+version = "0.1.0"
+dependencies = [
+ "drv-rng-api",
+ "drv-user-leds-api",
+ "rand_core",
+ "ringbuf",
+ "userlib",
+]
+
+[[package]]
 name = "task-sensor"
 version = "0.1.0"
 dependencies = [
