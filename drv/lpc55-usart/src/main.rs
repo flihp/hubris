@@ -69,10 +69,11 @@ fn main() -> ! {
         .fifotrig
         .modify(|_, w| unsafe { w.txlvl().bits(0).txlvlena().enabled() });
 
-    // This puts us at 9600 baud because it divides nicely with the
-    // 12mhz clock
-    usart.brg.write(|w| unsafe { w.brgval().bits(0x7c) });
-    usart.osr.write(|w| unsafe { w.osrval().bits(0x9) });
+    // flexcom0 is clocked at 12mhz
+    // 0 brg & 15 osr -> 750000 baud
+    // 0 brg & 7 osr -> 1.5Mbit baud
+    usart.brg.write(|w| unsafe { w.brgval().bits(0) });
+    usart.osr.write(|w| unsafe { w.osrval().bits(7) });
 
     // 8N1 configuration
     usart.cfg.write(|w| unsafe {
