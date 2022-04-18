@@ -161,22 +161,3 @@ start = true
 interrupts = {"flexcomm8.hs_spi" = 1}
 stacksize = 1000
 task-slots = ["gpio_driver", "syscon_driver"]
-
-[tasks.ping]
-path = "../../task/ping"
-name = "task-ping"
-features = ["uart"]
-priority = 4
-requires = {flash = 8192, ram = 1024}
-start = true
-stacksize = 512
-task-slots = [{peer = "pong"}, "usart_driver"]
-
-[tasks.pong]
-path = "../../task/pong"
-name = "task-pong"
-priority = 3
-requires = {flash = 8192, ram = 2048}
-start = true
-stacksize = 1000
-task-slots = ["user_leds"]
