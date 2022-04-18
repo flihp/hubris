@@ -16,11 +16,28 @@ use idol_runtime::{ClientError, RequestError};
 use rand_chacha::ChaCha20Rng;
 use rand_core::block::{BlockRng, BlockRngCore};
 use rand_core::{impls, Error, RngCore, SeedableRng};
+use ringbuf::*;
 use userlib::*;
 
 use lpc55_pac as device;
 
 task_slot!(SYSCON, syscon_driver);
+
+#[derive(Copy, Clone, PartialEq)]
+enum Trace {
+    Fill(usize),
+    Init,
+    InitDone,
+    MaxChiLtMinChi,
+    MaxChiGt4,
+    ChiShift4xLt7,
+    RefreshCnt,
+    Read,
+    ReadDone,
+    None,
+}
+
+ringbuf!(Trace, 64, Trace::None);
 
 struct Lpc55Core {
     pmc: &'static lpc55_pac::pmc::RegisterBlock,
@@ -41,6 +58,7 @@ impl Lpc55Core {
 
     // Initialization per user manual v2.4, section 48.15.5, 2021-10-08
     fn init(&self) -> Result<(), RngError> {
+        ringbuf_entry!(Trace::Init);
         // Enable RNG input clock by clearing power down bit (PDRUNCFG0.PDEN_RNG) and
         // setting AHB RNG clock bit in AHBCLKCTRL.RNG register (AHBCLKCTRLSET2 =
         // 0x00002000).
@@ -84,6 +102,7 @@ impl Lpc55Core {
             while self.rng.online_test_val.read().min_chi_squared().bits()
                 >= self.rng.online_test_val.read().max_chi_squared().bits()
             {
+                ringbuf_entry!(Trace::MaxChiLtMinChi);
                 if retry_chi_min < RETRY_MAX {
                     retry_chi_min += 1;
                     hl::sleep_for(1);
@@ -99,10 +118,12 @@ impl Lpc55Core {
             // When ONLINE_TEST_VAL.MAX_CHI_SQUARED < 4, initialization is now
             // complete.
             if self.rng.online_test_val.read().max_chi_squared().bits() > 4 {
+                ringbuf_entry!(Trace::MaxChiGt4);
                 self.rng
                     .online_test_cfg
                     .modify(|_, w| w.activate().clear_bit());
                 if self.rng.counter_cfg.read().shift4x().bits() < 7 {
+                    ringbuf_entry!(Trace::ChiShift4xLt7);
                     self.rng.counter_cfg.modify(|r, w| unsafe {
                         w.shift4x().bits(r.shift4x().bits() + 1)
                     });
@@ -117,10 +138,12 @@ impl Lpc55Core {
                 break;
             }
         }
+        ringbuf_entry!(Trace::InitDone);
         Ok(())
     }
     // Read RNG register per user manual v2.4, section 48.15.6, 2021-10-08
     fn read(&self) -> Result<u32, RngError> {
+        ringbuf_entry!(Trace::Read);
         // if the oscilator is powered off, we won't get good RNG.
         if self.pmc.pdruncfg0.read().pden_rng().is_poweredoff() {
             return Err(RngError::PoweredOff);
@@ -131,6 +154,7 @@ impl Lpc55Core {
         //    since last reading of a random number.
         let mut retry = 0;
         while self.rng.counter_val.read().refresh_cnt().bits() != 31 {
+            ringbuf_entry!(Trace::RefreshCnt);
             if retry < RETRY_MAX {
                 hl::sleep_for(1);
                 retry += 1;
@@ -146,6 +170,7 @@ impl Lpc55Core {
         //    ONLINE_TEST_VAL.MAX_CHI_SQUARED becomes smaller or equal than 4.
         retry = 0;
         while self.rng.online_test_val.read().max_chi_squared().bits() > 4 {
+            ringbuf_entry!(Trace::MaxChiGt4);
             if retry < RETRY_MAX {
                 hl::sleep_for(1);
                 retry += 1;
@@ -155,6 +180,7 @@ impl Lpc55Core {
         }
         // 5. Go to step 2 and read new random number.
         // NOTE: calling this function again is equivalent to 'go to step 2'
+        ringbuf_entry!(Trace::ReadDone);
         Ok(number)
     }
 }
@@ -274,6 +300,7 @@ impl idl::InOrderRngImpl for Lpc55RngServer {
         _: &userlib::RecvMessage,
         dest: idol_runtime::Leased<idol_runtime::W, [u8]>,
     ) -> Result<usize, RequestError<RngError>> {
+        ringbuf_entry!(Trace::Fill(dest.len()));
         let mut cnt = 0;
         const STEP: usize = size_of::<u32>();
         let mut buf = [0u8; STEP];
