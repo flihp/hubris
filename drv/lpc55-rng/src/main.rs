@@ -164,7 +164,7 @@ impl BlockRngCore for Lpc55Core {
     type Results = [u32; 1];
 
     fn generate(&mut self, results: &mut Self::Results) {
-        results[0] = self.read().expect("self.rng.read()");
+        results[0] = self.read().expect("Lpc55Core read()");
     }
 }
 
@@ -260,11 +260,11 @@ where
     }
 }
 
-struct Lpc55RngServer(ReseedingRng<ChaCha20Rng>);
+struct Lpc55RngServer(Lpc55Rng);
 
 impl Lpc55RngServer {
-    fn new(reseeder: Lpc55Rng, threshold: usize) -> Result<Self, Error> {
-        Ok(Lpc55RngServer(ReseedingRng::new(reseeder, threshold)?))
+    fn new(rng: Lpc55Rng) -> Self {
+        Lpc55RngServer(rng)
     }
 }
 
@@ -302,9 +302,7 @@ fn main() -> ! {
     let rng = Lpc55Rng::new();
     rng.init().expect("Rng failed init");
 
-    let threshold = 0x100000; // 1 MiB
-    let mut rng = Lpc55RngServer::new(rng, threshold)
-        .expect("Failed to create Lpc55RngServer");
+    let mut rng = Lpc55RngServer::new(rng);
 
     let mut buffer = [0u8; idl::INCOMING_SIZE];
 
