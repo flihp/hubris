@@ -28,9 +28,6 @@ enum Trace {
     Fill(usize),
     Init,
     InitDone,
-    MaxChiLtMinChi,
-    MaxChiGt4,
-    ChiShift4xLt7,
     RefreshCnt,
     Read,
     ReadDone,
@@ -80,64 +77,6 @@ impl Lpc55Core {
             .leave_reset(Peripheral::Rng)
             .expect("leave_reset");
 
-        let mut retry = 0;
-        loop {
-            // For revision 1B, the recommendation is to perform CHI computing only
-            // on one specific unprecise clock by selecting COUNTER_CFG.CLOCK_SEL = 4.
-            // This setting is needed to accumulating linear entropy.
-            // Set COUNTER_CFG.CLOCK_SEL = 4 to perform CHI SQUARED Test and
-            // activate CHI computing with ONLINE_TEST_CFG.ACTIVATE = 1.
-            self.rng
-                .counter_cfg
-                .modify(|_, w| unsafe { w.clock_sel().bits(4) });
-            self.rng
-                .online_test_cfg
-                .modify(|_, w| w.activate().set_bit());
-
-            // At power on ONLINE_TEST_VAL.MIN_CHI_SQUARED value is higher than
-            // ONLINE_TEST_VAL.MAX_CHI_SQUARED. Wait until
-            // ONLINE_TEST_VAL.MIN_CHI_SQUARED decreases and becomes smaller than
-            // ONLINE_TEST_VAL.MAX_CHI_SQUARED value.
-            let mut retry_chi_min = 0;
-            while self.rng.online_test_val.read().min_chi_squared().bits()
-                >= self.rng.online_test_val.read().max_chi_squared().bits()
-            {
-                ringbuf_entry!(Trace::MaxChiLtMinChi);
-                if retry_chi_min < RETRY_MAX {
-                    retry_chi_min += 1;
-                    hl::sleep_for(1);
-                } else {
-                    return Err(RngError::TimeoutChi2Min);
-                }
-            }
-
-            // If ONLINE_TEST_VAL.MAX_CHI_SQUARED > 4, program
-            // ONLINE_TEST_CFG.ACTIVATE = 0 (to reset), if COUNTER_CFG.SHIFT4X < 7,
-            // increment COUNTER_CFG.SHIFT4X then go back to step 2. This will start
-            // accumulating entropy.
-            // When ONLINE_TEST_VAL.MAX_CHI_SQUARED < 4, initialization is now
-            // complete.
-            if self.rng.online_test_val.read().max_chi_squared().bits() > 4 {
-                ringbuf_entry!(Trace::MaxChiGt4);
-                self.rng
-                    .online_test_cfg
-                    .modify(|_, w| w.activate().clear_bit());
-                if self.rng.counter_cfg.read().shift4x().bits() < 7 {
-                    ringbuf_entry!(Trace::ChiShift4xLt7);
-                    self.rng.counter_cfg.modify(|r, w| unsafe {
-                        w.shift4x().bits(r.shift4x().bits() + 1)
-                    });
-                }
-                if retry < RETRY_MAX {
-                    hl::sleep_for(1);
-                    retry += 1;
-                } else {
-                    return Err(RngError::TimeoutChi2Gt4);
-                }
-            } else {
-                break;
-            }
-        }
         ringbuf_entry!(Trace::InitDone);
         Ok(())
     }
@@ -165,19 +104,6 @@ impl Lpc55Core {
         // 3. Read new Random number by reading RANDOM_NUMBER register. This will
         //    reset COUNTER_VAL.REFRESH_CNT to zero.
         let number = self.rng.random_number.read().bits();
-        // 4. Perform online CHI computing check by checking
-        //    ONLINE_TEST_VAL.MAX_CHI_SQUARED value. Wait till
-        //    ONLINE_TEST_VAL.MAX_CHI_SQUARED becomes smaller or equal than 4.
-        retry = 0;
-        while self.rng.online_test_val.read().max_chi_squared().bits() > 4 {
-            ringbuf_entry!(Trace::MaxChiGt4);
-            if retry < RETRY_MAX {
-                hl::sleep_for(1);
-                retry += 1;
-            } else {
-                return Err(RngError::TimeoutChi2Gt4);
-            }
-        }
         // 5. Go to step 2 and read new random number.
         // NOTE: calling this function again is equivalent to 'go to step 2'
         ringbuf_entry!(Trace::ReadDone);
