@@ -28,7 +28,7 @@ enum Trace {
     Fill(usize),
     Init,
     InitDone,
-    RefreshCnt,
+    RefreshTimeout,
     Read,
     ReadDone,
     None,
@@ -82,7 +82,6 @@ impl Lpc55Core {
     }
     // Read RNG register per user manual v2.4, section 48.15.6, 2021-10-08
     fn read(&self) -> Result<u32, RngError> {
-        ringbuf_entry!(Trace::Read);
         // if the oscilator is powered off, we won't get good RNG.
         if self.pmc.pdruncfg0.read().pden_rng().is_poweredoff() {
             return Err(RngError::PoweredOff);
@@ -93,11 +92,11 @@ impl Lpc55Core {
         //    since last reading of a random number.
         let mut retry = 0;
         while self.rng.counter_val.read().refresh_cnt().bits() != 31 {
-            ringbuf_entry!(Trace::RefreshCnt);
             if retry < RETRY_MAX {
                 hl::sleep_for(1);
                 retry += 1;
             } else {
+                ringbuf_entry!(Trace::RefreshTimeout);
                 return Err(RngError::TimeoutRefreshCnt);
             }
         }
@@ -106,7 +105,6 @@ impl Lpc55Core {
         let number = self.rng.random_number.read().bits();
         // 5. Go to step 2 and read new random number.
         // NOTE: calling this function again is equivalent to 'go to step 2'
-        ringbuf_entry!(Trace::ReadDone);
         Ok(number)
     }
 }
