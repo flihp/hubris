@@ -30,8 +30,11 @@ enum Trace {
     InitDone,
     MaxChiLtMinChi,
     MaxChiGt4,
+    Chi2MinTimeout,
+    Chi2Gt4Timeout,
+    Chi2Gt4InitTimeout,
     ChiShift4xLt7,
-    RefreshCnt,
+    RefreshTimeout,
     Read,
     ReadDone,
     None,
@@ -107,6 +110,7 @@ impl Lpc55Core {
                     retry_chi_min += 1;
                     hl::sleep_for(1);
                 } else {
+                    ringbuf_entry!(Trace::Chi2MinTimeout);
                     return Err(RngError::TimeoutChi2Min);
                 }
             }
@@ -118,12 +122,10 @@ impl Lpc55Core {
             // When ONLINE_TEST_VAL.MAX_CHI_SQUARED < 4, initialization is now
             // complete.
             if self.rng.online_test_val.read().max_chi_squared().bits() > 4 {
-                ringbuf_entry!(Trace::MaxChiGt4);
                 self.rng
                     .online_test_cfg
                     .modify(|_, w| w.activate().clear_bit());
                 if self.rng.counter_cfg.read().shift4x().bits() < 7 {
-                    ringbuf_entry!(Trace::ChiShift4xLt7);
                     self.rng.counter_cfg.modify(|r, w| unsafe {
                         w.shift4x().bits(r.shift4x().bits() + 1)
                     });
@@ -132,6 +134,7 @@ impl Lpc55Core {
                     hl::sleep_for(1);
                     retry += 1;
                 } else {
+                    ringbuf_entry!(Trace::Chi2Gt4InitTimeout);
                     return Err(RngError::TimeoutChi2Gt4);
                 }
             } else {
@@ -143,7 +146,6 @@ impl Lpc55Core {
     }
     // Read RNG register per user manual v2.4, section 48.15.6, 2021-10-08
     fn read(&self) -> Result<u32, RngError> {
-        ringbuf_entry!(Trace::Read);
         // if the oscilator is powered off, we won't get good RNG.
         if self.pmc.pdruncfg0.read().pden_rng().is_poweredoff() {
             return Err(RngError::PoweredOff);
@@ -154,11 +156,11 @@ impl Lpc55Core {
         //    since last reading of a random number.
         let mut retry = 0;
         while self.rng.counter_val.read().refresh_cnt().bits() != 31 {
-            ringbuf_entry!(Trace::RefreshCnt);
             if retry < RETRY_MAX {
                 hl::sleep_for(1);
                 retry += 1;
             } else {
+                ringbuf_entry!(Trace::RefreshTimeout);
                 return Err(RngError::TimeoutRefreshCnt);
             }
         }
@@ -170,17 +172,16 @@ impl Lpc55Core {
         //    ONLINE_TEST_VAL.MAX_CHI_SQUARED becomes smaller or equal than 4.
         retry = 0;
         while self.rng.online_test_val.read().max_chi_squared().bits() > 4 {
-            ringbuf_entry!(Trace::MaxChiGt4);
             if retry < RETRY_MAX {
                 hl::sleep_for(1);
                 retry += 1;
             } else {
+                ringbuf_entry!(Trace::Chi2Gt4Timeout);
                 return Err(RngError::TimeoutChi2Gt4);
             }
         }
         // 5. Go to step 2 and read new random number.
         // NOTE: calling this function again is equivalent to 'go to step 2'
-        ringbuf_entry!(Trace::ReadDone);
         Ok(number)
     }
 }
