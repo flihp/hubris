@@ -1,0 +1,18 @@
+[package]
+name = "lib-lpc55-usart"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cfg-if = "1"
+embedded-hal = "0.2"
+drv-lpc55-syscon-api = { path = "../../drv/lpc55-syscon-api", optional = true }
+lpc55-pac = "0.3.0"
+nb = "1"
+userlib = { path = "../../sys/userlib", optional = true }
+unwrap-lite = { path = "../../lib/unwrap-lite" }
+ringbuf = { path = "../../lib/ringbuf" }
+
+[features]
+default = ["tasks"]
+tasks = ["drv-lpc55-syscon-api", "userlib/panic-messages"]
