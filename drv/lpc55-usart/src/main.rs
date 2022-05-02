@@ -16,7 +16,7 @@
 #![no_std]
 #![no_main]
 
-use drv_lpc55_syscon_api::*;
+use lib_lpc55_usart::{Usart, Write};
 use lpc55_pac as device;
 use userlib::*;
 use zerocopy::AsBytes;
@@ -43,55 +43,15 @@ struct Transmit {
 
 #[export_name = "main"]
 fn main() -> ! {
-    // Turn the actual peripheral on so that we can interact with it.
-    turn_on_flexcomm();
+    let peripherals = device::Peripherals::take().unwrap_lite();
+
+    let usart = peripherals.USART0;
+    let flexcomm0 = peripherals.FLEXCOMM0;
+
+    let mut usart = Usart::turn_on(&flexcomm0, &usart);
 
     let gpio_driver = GPIO.get_task_id();
-
     setup_pins(gpio_driver).unwrap_lite();
-
-    // We have two blocks to worry about: the FLEXCOMM for switching
-    // between modes and the actual USART. These are technically
-    // part of the same block for the purposes of a register block
-    // in app.toml but separate for the purposes of writing here
-
-    let flexcomm = unsafe { &*device::FLEXCOMM0::ptr() };
-
-    let usart = unsafe { &*device::USART0::ptr() };
-
-    // Set USART mode
-    flexcomm.pselid.write(|w| w.persel().usart());
-
-    usart.fifocfg.modify(|_, w| w.enabletx().enabled());
-
-    // We actually get interrupts from the FIFO
-    // Trigger when the FIFO is empty for now
-    usart
-        .fifotrig
-        .modify(|_, w| unsafe { w.txlvl().bits(0).txlvlena().enabled() });
-
-    // This puts us at 9600 baud because it divides nicely with the
-    // 12mhz clock
-    usart.brg.write(|w| unsafe { w.brgval().bits(0x7c) });
-    usart.osr.write(|w| unsafe { w.osrval().bits(0x9) });
-
-    // 8N1 configuration
-    usart.cfg.write(|w| unsafe {
-        w.paritysel()
-            .bits(0)
-            .stoplen()
-            .bit(false)
-            .datalen()
-            .bits(1)
-            .loop_()
-            .normal()
-            .syncen()
-            .asynchronous_mode()
-            .clkpol()
-            .falling_edge()
-            .enable()
-            .enabled()
-    });
 
     // USART side yet, so this won't trigger notifications yet.
     sys_irq_control(1, true);
@@ -109,12 +69,12 @@ fn main() -> ! {
                 // unconditionally re-enable the IRQ at the end of the handler.
                 if let Some(txs) = tx.as_mut() {
                     // Transmit in progress, check to see if TX is empty.
-                    if usart.stat.read().txidle().bit() {
+                    if usart.is_tx_idle() {
                         // TX register empty. Time to send something.
-                        if step_transmit(&usart, txs) {
+                        if step_transmit(&mut usart, txs) {
                             tx = None;
                             // This is a write to clear register
-                            usart.intenclr.write(|w| w.txidleclr().set_bit());
+                            usart.clear_tx_idle_interrupt();
                         }
                     }
                 }
@@ -175,7 +135,7 @@ fn main() -> ! {
                         len,
                     });
 
-                    usart.intenset.modify(|_, w| w.txidleen().set_bit());
+                    usart.set_tx_idle_interrupt();
 
                     // We'll do the rest as interrupts arrive.
                 }
@@ -185,17 +145,7 @@ fn main() -> ! {
     }
 }
 
-fn turn_on_flexcomm() {
-    let syscon = Syscon::from(SYSCON.get_task_id());
-
-    syscon.enable_clock(Peripheral::Fc0).unwrap_lite();
-    syscon.leave_reset(Peripheral::Fc0).unwrap_lite();
-}
-
-fn step_transmit(
-    usart: &device::usart0::RegisterBlock,
-    txs: &mut Transmit,
-) -> bool {
+fn step_transmit(usart: &mut Usart, txs: &mut Transmit) -> bool {
     let mut byte = 0u8;
     let (rc, len) = sys_borrow_read(txs.task, 0, txs.pos, byte.as_bytes_mut());
     if rc != 0 || len != 1 {
@@ -203,18 +153,20 @@ fn step_transmit(
         true
     } else {
         // Stuff byte into transmitter.
-        //
-        // This is marked as unsafe for reasons I don't quite understand?
-        unsafe {
-            usart.fifowr.write(|w| w.bits(byte as u32));
-        }
-
-        txs.pos += 1;
-        if txs.pos == txs.len {
-            sys_reply(txs.task, ResponseCode::Success as u32, &[]);
-            true
-        } else {
-            false
+        match usart.write(byte) {
+            Ok(_) => {
+                txs.pos += 1;
+                if txs.pos == txs.len {
+                    sys_reply(txs.task, ResponseCode::Success as u32, &[]);
+                    true
+                } else {
+                    false
+                }
+            }
+            Err(nb::Error::WouldBlock) => false,
+            Err(nb::Error::Other(e)) => {
+                panic!("write to Usart failed: {:?}", e)
+            }
         }
     }
 }
