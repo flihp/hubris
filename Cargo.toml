@@ -22,6 +22,7 @@ members = [
     "lib/fixedmap",
     "lib/gnarle",
     "lib/hypocalls",
+    "lib/lpc55-usart",
     "lib/phash",
     "lib/ringbuf",
     "lib/unwrap-lite",
