@@ -19,6 +19,7 @@ members = [
     "lib/derive-idol-err",
     "lib/dice",
     "lib/dice-cert-tmpl",
+    "lib/dice-cert-sign",
     "lib/fixedmap",
     "lib/gnarle",
     "lib/hypocalls",

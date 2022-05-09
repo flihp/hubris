@@ -1,0 +1,13 @@
+[package]
+name = "dice-cert-sign"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "3", features = ["derive"] }
+dice = { path = "../dice" }
+pem = "1"
+serialport = "4"
+
+[build-dependencies]
+dice-cert-tmpl = { path = "../dice-cert-tmpl" }
