@@ -3212,6 +3212,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "task-lpc55-uartecho"
+version = "0.1.0"
+dependencies = [
+ "build-lpc55pins",
+ "build-util",
+ "cfg-if",
+ "drv-lpc55-gpio-api",
+ "drv-lpc55-syscon-api",
+ "lib-lpc55-usart",
+ "lpc55-pac",
+ "nb 1.0.0",
+ "ringbuf",
+ "serde",
+ "unwrap-lite",
+ "userlib",
+]
+
+[[package]]
 name = "task-monorail-server"
 version = "0.1.0"
 dependencies = [
