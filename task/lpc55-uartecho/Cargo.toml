@@ -1,0 +1,31 @@
+[package]
+name = "task-lpc55-uartecho"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cfg-if = "1"
+drv-lpc55-gpio-api = { path = "../../drv/lpc55-gpio-api", optional = true }
+drv-lpc55-syscon-api = { path = "../../drv/lpc55-syscon-api", optional = true }
+lib-lpc55-usart = { path = "../../lib/lpc55-usart", default-features = false }
+lpc55-pac = "0.3"
+nb = "1.0"
+ringbuf = { path = "../../lib/ringbuf" }
+unwrap-lite = { path = "../../lib/unwrap-lite" }
+userlib = { path = "../../sys/userlib", features = ["panic-messages"] }
+
+[build-dependencies]
+cfg-if = "1"
+build-lpc55pins = { path = "../../build/lpc55pins" }
+build-util = { path = "../../build/util" }
+serde = "1"
+
+[features]
+tasks = ["lib-lpc55-usart/tasks", "drv-lpc55-gpio-api", "drv-lpc55-syscon-api"]
+
+# This section is here to discourage RLS/rust-analyzer from doing test builds,
+# since test builds don't work for cross compilation.
+[[bin]]
+name = "task-lpc55-uartecho"
+test = false
+bench = false
