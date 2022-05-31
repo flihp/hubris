@@ -42,6 +42,7 @@ members = [
 
     "task/template",
 
+    "task/dicer",
     "task/lpc55-uartecho",
     "task/jefe",
     "task/jefe-api",

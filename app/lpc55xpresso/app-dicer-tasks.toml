@@ -1,0 +1,165 @@
+name = "lpc55xpresso"
+target = "thumbv8m.main-none-eabihf"
+board = "lpcxpresso55s69"
+chip = "../../chips/lpc55"
+stacksize = 1024
+secure-separation = true
+
+[kernel]
+name = "lpc55xpresso"
+requires = {flash = 32768, ram = 4096}
+features = ["itm"]
+
+[outputs.bootloader_sram]
+address = 0x14000000
+size = 0x8000
+
+[outputs.bootloader_flash]
+address = 0x00000000
+size = 0x7000
+
+[outputs.bootloader_ram]
+address = 0x20000000
+size = 0x4000
+
+# We reserve the last sector (0x8000) for flash testing
+[outputs.flash]
+address = 0x00008000
+size = 0x88000
+read = true
+execute = true
+
+[outputs.ram]
+address = 0x20004000
+size = 0x18000
+read = true
+write = true
+execute = true
+
+[signing.combined]
+method = "ecc"
+priv-key = "../../support/fake_certs/p256-private-key.der"
+
+[signing.bootloader]
+method = "rsa"
+priv-key = "../../support/fake_certs/fake_private_key.pem"
+root-cert = "../../support/fake_certs/fake_certificate.der.crt"
+
+[bootloader]
+name = "stage0"
+# Currently we have the first 0x8000 of flash and first 0x4000 of RAM
+# dedicated for the stage0 bootloader and the rest for Hubris. Once we have
+# multiple images this will need to be adjusted
+imagea-flash-start = 0x8000
+imagea-flash-size = 0x88000
+imagea-ram-start = 0x20004000
+imagea-ram-size = 0x18000
+features = ["tz_support"]
+
+[tasks.jefe]
+name = "task-jefe"
+priority = 0
+max-sizes = {flash = 8192, ram = 2048}
+start = true
+features = ["itm"]
+stacksize = 1536
+
+[tasks.hiffy]
+name = "task-hiffy"
+priority = 5
+features = ["lpc55", "gpio", "rng"]
+max-sizes = {flash = 32768, ram = 16384 }
+stacksize = 2048
+start = true
+task-slots = ["gpio_driver", "rng_driver"]
+
+[tasks.idle]
+name = "task-idle"
+priority = 7
+max-sizes = {flash = 256, ram = 256}
+stacksize = 256
+start = true
+
+[tasks.syscon_driver]
+name = "drv-lpc55-syscon"
+priority = 2
+max-sizes = {flash = 8192, ram = 2048}
+uses = ["syscon", "anactrl", "pmc"]
+start = true
+stacksize = 1000
+
+[tasks.gpio_driver]
+name = "drv-lpc55-gpio"
+priority = 3
+max-sizes = {flash = 8192, ram = 2048}
+uses = ["gpio", "iocon"]
+start = true
+stacksize = 1000
+task-slots = ["syscon_driver"]
+
+[tasks.user_leds]
+name = "drv-user-leds"
+features = ["lpc55"]
+priority = 4
+max-sizes = {flash = 8192, ram = 2048}
+start = true
+stacksize = 1000
+task-slots = ["gpio_driver"]
+
+[tasks.i2c_driver]
+name = "drv-lpc55-i2c"
+priority = 4
+max-sizes = {flash = 8192, ram = 2048}
+uses = ["flexcomm4"]
+start = true
+stacksize = 1000
+task-slots = ["gpio_driver", "syscon_driver"]
+
+[tasks.rng_driver]
+name = "drv-lpc55-rng"
+priority = 3
+max-sizes = {flash = 16384, ram = 8192}
+uses = ["rng", "pmc"]
+start = true
+stacksize = 2200
+task-slots = ["syscon_driver"]
+
+[tasks.spi0_driver]
+name = "drv-lpc55-spi-server"
+priority = 4
+max-sizes = {flash = 16384, ram = 2048}
+features = ["spi0"]
+uses = ["flexcomm8"]
+start = true
+interrupts = {"flexcomm8.hs_spi" = 1}
+stacksize = 1000
+task-slots = ["gpio_driver", "syscon_driver"]
+
+[tasks.spi0_driver.config]
+pins = [
+# HS_SPI_MOSI = P0_26 = FUN9
+{ pin = { port = 0, pin = 26}, alt = 9},
+# HS_SPI_MISO = P1_3 = FUN6
+{ pin = { port = 1, pin = 3}, alt = 6},
+# HS_SPI_SCK = P1_2 = FUN6
+{ pin = { port = 1, pin = 2}, alt = 6},
+# HS_SSEL1 = P1_1 = FUN5
+{ pin = { port = 1, pin = 1}, alt = 5},
+]
+
+[tasks.dicer]
+name = "task-dicer"
+priority = 4
+# inflated for ringbuf for debugging & demo
+max-sizes = {flash = 65536, ram = 16384}
+stacksize = 8192
+start = true
+uses = ["flexcomm0", "syscon"]
+task-slots = ["gpio_driver", "syscon_driver", "rng_driver"]
+features = ["tasks"]
+
+[tasks.dicer.config]
+pins = [
+{ pin = { port = 0, pin = 29}, alt = 1},
+{ pin = { port = 0, pin = 30}, alt = 1}
+]

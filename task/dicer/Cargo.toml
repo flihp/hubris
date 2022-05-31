@@ -1,0 +1,39 @@
+[package]
+name = "task-dicer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cfg-if = "1"
+embedded-hal = "0.2"
+dice = { path = "../../lib/dice", default-features = false }
+drv-lpc55-gpio-api = { path = "../../drv/lpc55-gpio-api", optional = true }
+drv-lpc55-syscon-api = { path = "../../drv/lpc55-syscon-api", optional = true }
+drv-rng-api = { path = "../../drv/rng-api" }
+rand = { version = "0.8", default-features = false }
+hubpack = "0.1"
+lib-lpc55-usart = { path = "../../lib/lpc55-usart", default-features = false }
+lpc55-pac = "0.3.0"
+nb = "1"
+salty = "0.2"
+sha1 = { version = "0.10", default-features = false }
+userlib = { path = "../../sys/userlib", features = ["panic-messages"] }
+ringbuf = { path = "../../lib/ringbuf" }
+unwrap-lite = { path = "../../lib/unwrap-lite" }
+
+[build-dependencies]
+anyhow = "1.0.31"
+build-lpc55pins = { path = "../../build/lpc55pins" }
+build-util = { path = "../../build/util" }
+serde = "1"
+
+[features]
+# no default, hubris app.toml doesn't have a mechanism to disable (afaik)
+tasks = ["lib-lpc55-usart/tasks", "drv-lpc55-gpio-api", "drv-lpc55-syscon-api"]
+
+# This section is here to discourage RLS/rust-analyzer from doing test builds,
+# since test builds don't work for cross compilation.
+[[bin]]
+name = "task-dicer"
+test = false
+bench = false
