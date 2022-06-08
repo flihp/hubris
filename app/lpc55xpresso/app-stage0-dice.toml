@@ -135,7 +135,7 @@ task-slots = ["gpio_driver", "syscon_driver"]
 name = "drv-lpc55-rng"
 priority = 3
 max-sizes = {flash = 16384, ram = 8192}
-uses = ["rng", "pmc"]
+uses = ["rng", "pmc", "dice_rng"]
 start = true
 stacksize = 2200
 task-slots = ["syscon_driver"]
