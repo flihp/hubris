@@ -18,6 +18,17 @@ use rand_core::block::{BlockRng, BlockRngCore};
 use rand_core::{impls, Error, RngCore, SeedableRng};
 use userlib::*;
 
+use dice::{RngHandoff, SerialNumber};
+use ringbuf::{ringbuf, ringbuf_entry};
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum Trace {
+    SerialNumber(SerialNumber),
+    None,
+}
+
+ringbuf!(Trace, 64, Trace::None);
+
 use lpc55_pac as device;
 
 task_slot!(SYSCON, syscon_driver);
@@ -200,6 +211,9 @@ impl idl::InOrderRngImpl for Lpc55RngServer {
 
 #[export_name = "main"]
 fn main() -> ! {
+    let rng_handoff = RngHandoff::from_mem();
+    ringbuf_entry!(Trace::SerialNumber(rng_handoff.serial_number));
+
     let rng = Lpc55Rng::new();
     rng.init();
 

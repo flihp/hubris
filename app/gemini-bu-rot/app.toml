@@ -109,7 +109,7 @@ pins = [
 [tasks.rng_driver]
 name = "drv-lpc55-rng"
 priority = 3
-max-sizes = {flash = 16384, ram = 4096}
+max-sizes = {flash = 16384, ram = 8192}
 uses = ["rng", "pmc"]
 start = true
 stacksize = 2200

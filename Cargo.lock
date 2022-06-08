@@ -921,6 +921,7 @@ name = "drv-lpc55-rng"
 version = "0.1.0"
 dependencies = [
  "cfg-if",
+ "dice",
  "drv-lpc55-syscon-api",
  "drv-rng-api",
  "idol",
@@ -929,6 +930,7 @@ dependencies = [
  "num-traits",
  "rand_chacha",
  "rand_core",
+ "ringbuf",
  "userlib",
  "zerocopy",
 ]
