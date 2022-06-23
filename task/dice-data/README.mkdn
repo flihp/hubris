@@ -1,0 +1,3 @@
+# Root of Trust for Reporting
+This task retrieves the DICE artifacts including the Alias seed and cert from
+memory. It then constructs an ed25519 keypair from this seed.

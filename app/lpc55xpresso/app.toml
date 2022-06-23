@@ -9,7 +9,7 @@ secure-task = "secure"
 
 [kernel]
 name = "lpc55xpresso"
-requires = {flash = 32768, ram = 4096}
+requires = {flash = 32768, ram = 8192}
 features = ["itm"]
 
 [tasks.jefe]
@@ -151,3 +151,10 @@ start = true
 stacksize = 1000
 task-slots = ["user_leds"]
 
+[tasks.dice_data]
+name = "dice-data"
+priority = 5
+max-sizes = {flash = 32768, ram = 16384}
+start = true
+stacksize = 10000
+uses = ["dice_alias"]
