@@ -180,3 +180,10 @@ start = true
 stacksize = 1000
 task-slots = ["user_leds"]
 
+[tasks.rot_r]
+name = "rot-r"
+priority = 5
+max-sizes = {flash = 32768, ram = 16384}
+start = true
+stacksize = 8000
+uses = ["dice_alias"]
