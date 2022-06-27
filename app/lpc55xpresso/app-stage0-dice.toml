@@ -54,7 +54,7 @@ imagea-flash-start = 0x8000
 imagea-flash-size = 0x88000
 imagea-ram-start = 0x20004000
 imagea-ram-size = 0x18000
-features = ["tz_support", "dice"]
+features = ["tz_support", "dice-self"]
 
 [tasks.jefe]
 name = "task-jefe"
