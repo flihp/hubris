@@ -5,9 +5,10 @@
 use crate::{ED25519_PUB_LEN, ED25519_SIG_LEN, SN_LEN};
 use std::{error, fmt, result};
 
+// Clippy nates this type name. But renaming it to CertMissingFieldError like
+// we did in the Csr module causes the compiler to panic.
 #[derive(Debug, PartialEq)]
 pub enum CertError {
-    PatternNotFound,
     NoAuthorityKeyId,
     NoFwid,
     NoIssuerSn,
@@ -18,7 +19,6 @@ pub enum CertError {
     NoSignData,
     NoSubjectSn,
     NoSubjectKeyId,
-    TooSmall,
 }
 
 impl error::Error for CertError {}
@@ -26,7 +26,6 @@ impl error::Error for CertError {}
 impl fmt::Display for CertError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            CertError::PatternNotFound => write!(f, "Pattern not found."),
             CertError::NoAuthorityKeyId => {
                 write!(f, "authorityKeyId not found")
             }
@@ -39,7 +38,6 @@ impl fmt::Display for CertError {
             CertError::NoSignData => write!(f, "No signdata found."),
             CertError::NoSubjectKeyId => write!(f, "No subject key ID found."),
             CertError::NoSubjectSn => write!(f, "No subject SN found."),
-            CertError::TooSmall => write!(f, "Buffer is too small."),
         }
     }
 }
@@ -62,51 +60,6 @@ impl<'a> Cert<'a> {
         self.as_bytes().len()
     }
 
-    fn get_pattern_offset(&self, pattern: &[u8]) -> Option<usize> {
-        self.0.windows(pattern.len()).position(|w| w == pattern)
-    }
-
-    fn get_offsets(
-        &self,
-        pattern: &[u8],
-        length: usize,
-    ) -> Option<(usize, usize)> {
-        let offset = self.get_pattern_offset(pattern)?;
-
-        let start = offset + pattern.len();
-        let end = start + length;
-
-        if end <= self.len() {
-            Some((start, end))
-        } else {
-            None
-        }
-    }
-
-    fn get_pattern_roffset(&self, pattern: &[u8]) -> Option<usize> {
-        self.0.windows(pattern.len()).rposition(|w| w == pattern)
-    }
-
-    fn get_roffsets(
-        &self,
-        pattern: &[u8],
-        length: usize,
-    ) -> Option<(usize, usize)> {
-        let offset = self.get_pattern_roffset(pattern)?;
-
-        println!("found pattern at offset: {}", offset);
-
-        let start = offset + pattern.len();
-        let end = start + length;
-
-        if end <= self.len() {
-            Some((start, end))
-        } else {
-            println!("end > self.len(): {} > {}", end, self.len());
-            None
-        }
-    }
-
     pub fn clear_range(&mut self, start: usize, end: usize) {
         self.0[start..end].fill(0)
     }
@@ -122,8 +75,12 @@ impl<'a> Cert<'a> {
     // so a single byte is plenty
     const SERIAL_NUMBER_LEN: usize = 1;
     pub fn get_serial_number_offsets(&self) -> Result<(usize, usize)> {
-        self.get_offsets(&Self::SERIAL_NUMBER_PATTERN, Self::SERIAL_NUMBER_LEN)
-            .ok_or(CertError::NoSerialNumber)
+        crate::get_offsets(
+            self.0,
+            &Self::SERIAL_NUMBER_PATTERN,
+            Self::SERIAL_NUMBER_LEN,
+        )
+        .ok_or(CertError::NoSerialNumber)
     }
 
     // ANS.1 TLVs & OID for commonName (x.520 DN component)
@@ -133,7 +90,8 @@ impl<'a> Cert<'a> {
     const SELFCERT_ISSUER_SN_LEN: usize = SN_LEN;
 
     pub fn get_issuer_sn_offsets(&self) -> Result<(usize, usize)> {
-        self.get_offsets(
+        crate::get_offsets(
+            self.0,
             &Self::SELFCERT_ISSUER_SN_PATTERN,
             Self::SELFCERT_ISSUER_SN_LEN,
         )
@@ -145,8 +103,12 @@ impl<'a> Cert<'a> {
     const NOTBEFORE_LEN: usize = 13;
 
     pub fn get_notbefore_offsets(&self) -> Result<(usize, usize)> {
-        self.get_offsets(&Self::NOTBEFORE_PATTERN, Self::NOTBEFORE_LEN)
-            .ok_or(CertError::NoNotBefore)
+        crate::get_offsets(
+            self.0,
+            &Self::NOTBEFORE_PATTERN,
+            Self::NOTBEFORE_LEN,
+        )
+        .ok_or(CertError::NoNotBefore)
     }
 
     // ASN.1 TLVs & OID for commonName (x.520 DN component)
@@ -159,7 +121,8 @@ impl<'a> Cert<'a> {
     // patterns are the same. This function searches backward for the pattern
     // since issuer comes before subject in the structure
     pub fn get_subject_sn_offsets(&self) -> Result<(usize, usize)> {
-        self.get_roffsets(
+        crate::get_roffsets(
+            self.0,
             &Self::SELFCERT_SUBJECT_SN_PATTERN,
             Self::SELFCERT_SUBJECT_SN_LEN,
         )
@@ -171,8 +134,12 @@ impl<'a> Cert<'a> {
     ];
     const SELFCERT_PUB_LEN: usize = ED25519_PUB_LEN;
     pub fn get_pub_offsets(&self) -> Result<(usize, usize)> {
-        self.get_offsets(&Self::SELFCERT_PUB_PATTERN, Self::SELFCERT_PUB_LEN)
-            .ok_or(CertError::NoPub)
+        crate::get_offsets(
+            self.0,
+            &Self::SELFCERT_PUB_PATTERN,
+            Self::SELFCERT_PUB_LEN,
+        )
+        .ok_or(CertError::NoPub)
     }
 
     const SIGN_BEGIN: usize = 0x4;
@@ -182,15 +149,15 @@ impl<'a> Cert<'a> {
     pub fn get_signdata_offsets(&self) -> Result<(usize, usize)> {
         // Data to sign is between offset SIGN_BEGIN & beginning of this
         // pattern. This is the end of the certificationRequestInfo field.
-        let offset = self
-            .get_pattern_roffset(&Self::SIGNDATA_PATTERN)
-            .ok_or(CertError::NoSignData)?;
+        let offset =
+            crate::get_pattern_roffset(self.0, &Self::SIGNDATA_PATTERN)
+                .ok_or(CertError::NoSignData)?;
 
         Ok((Self::SIGN_BEGIN, offset))
     }
 
     pub fn get_sig_offsets(&self) -> Result<(usize, usize)> {
-        self.get_roffsets(&Self::SIGNDATA_PATTERN, ED25519_SIG_LEN)
+        crate::get_roffsets(self.0, &Self::SIGNDATA_PATTERN, ED25519_SIG_LEN)
             .ok_or(CertError::NoSig)
     }
 
@@ -202,7 +169,7 @@ impl<'a> Cert<'a> {
     // SHA3_256 length
     const FWID_LEN: usize = 32;
     pub fn get_fwid_offsets(&self) -> Result<(usize, usize)> {
-        self.get_offsets(&Self::FWID_BEGIN, Self::FWID_LEN)
+        crate::get_offsets(self.0, &Self::FWID_BEGIN, Self::FWID_LEN)
             .ok_or(CertError::NoFwid)
     }
 }

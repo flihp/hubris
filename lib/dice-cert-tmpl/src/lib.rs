@@ -3,8 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 pub mod cert;
+mod csr;
 
 use crate::cert::Cert;
+use crate::csr::Csr;
 
 use salty::constants::{
     PUBLICKEY_SERIALIZED_LENGTH, SIGNATURE_SERIALIZED_LENGTH,
@@ -15,6 +17,110 @@ pub const ED25519_PUB_LEN: usize = PUBLICKEY_SERIALIZED_LENGTH;
 pub const ED25519_SIG_LEN: usize = SIGNATURE_SERIALIZED_LENGTH;
 // TODO: get this programatically from the cert / csr
 pub const SN_LEN: usize = 12;
+pub const CN_LEN: usize = SN_LEN;
+
+/// This function should be called from a build.rs in hubris. It generates a
+/// source file that provides functionality to some hubris code that needs to
+/// generate a CSR.
+/// The path is to a valid CSR that meets the assumptions made in this crate.
+/// The stub_name is the path to the file generated.
+pub fn build_csr(stub_name: &str) -> Result<(), Box<dyn Error>> {
+    let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap()).join(stub_name);
+    let mut stub_file = File::create(out)?;
+
+    let mut csr = *include_bytes!("../data/ed25519-csr.der");
+    let csr = Csr::from_slice(&mut csr);
+
+    writeln!(
+        stub_file,
+        "#[allow(dead_code)]\npub const SIZE: usize = {};",
+        csr.len()
+    )?;
+
+    let (pub_start, pub_end) = csr.get_pub_offsets()?;
+    writeln!(
+        stub_file,
+        "#[allow(dead_code)]\npub const PUB_START: usize = {};",
+        pub_start
+    )?;
+    writeln!(
+        stub_file,
+        "#[allow(dead_code)]\npub const PUB_END: usize = {};",
+        pub_end
+    )?;
+
+    buf_out(&mut stub_file, "CSR_PRE_PUB", &csr.as_bytes()[..pub_start])?;
+
+    let (cn_start, cn_end) = csr.get_cn_offsets()?;
+    writeln!(
+        stub_file,
+        "#[allow(dead_code)]\npub const CN_START: usize = {};",
+        cn_start
+    )?;
+    writeln!(
+        stub_file,
+        "#[allow(dead_code)]\npub const CN_END: usize = {};",
+        cn_end
+    )?;
+    writeln!(
+        stub_file,
+        "#[allow(dead_code)]\npub const CN_LENGTH: usize = {};",
+        CN_LEN
+    )?;
+
+    let (sig_start, sig_end) = csr.get_sig_offsets()?;
+
+    writeln!(
+        stub_file,
+        "#[allow(dead_code)]\npub const SIG_START: usize = {};",
+        sig_start
+    )?;
+    writeln!(
+        stub_file,
+        "#[allow(dead_code)]\npub const SIG_END: usize = {};",
+        sig_end
+    )?;
+
+    let (signdata_start, signdata_end) = csr.get_signdata_offsets()?;
+    writeln!(
+        stub_file,
+        "#[allow(dead_code)]\npub const SIGNDATA_START: usize = {};",
+        signdata_start
+    )?;
+    writeln!(
+        stub_file,
+        "#[allow(dead_code)]\npub const SIGNDATA_END: usize = {};",
+        signdata_end
+    )?;
+    writeln!(
+        stub_file,
+        "#[allow(dead_code)]\npub const SIGNDATA_LENGTH: usize = {};",
+        signdata_end - signdata_start
+    )?;
+
+    buf_out(
+        &mut stub_file,
+        "CSR_PUB_TO_SIG",
+        &csr.as_bytes()[pub_end..sig_start],
+    )?;
+
+    writeln!(
+        stub_file,
+        "#[allow(dead_code)]\npub fn fill(csr: &mut [u8; {}], cn: &[u8; {}]) {{",
+        csr.len(),
+        CN_LEN
+    )?;
+    writeln!(stub_file, "csr[..PUB_START].copy_from_slice(&CSR_PRE_PUB);")?;
+    writeln!(
+        stub_file,
+        "csr[PUB_END..SIG_START].copy_from_slice(&CSR_PUB_TO_SIG);"
+    )?;
+    writeln!(stub_file, "csr[CN_START..CN_END].copy_from_slice(cn);}}")?;
+
+    call_rustfmt::rustfmt(&out)?;
+
+    Ok(())
+}
 
 /// This function should be called from a build.rs in hubris. It generates a
 /// source file that includes:
@@ -239,4 +345,81 @@ fn buf_out<F: Write>(
     }
     writeln!(out, "];")?;
     Ok(())
+}
+
+fn get_pattern_offset(data: &[u8], pattern: &[u8]) -> Option<usize> {
+    data.windows(pattern.len()).position(|w| w == pattern)
+}
+
+fn get_offsets(
+    data: &[u8],
+    pattern: &[u8],
+    length: usize,
+) -> Option<(usize, usize)> {
+    let offset = get_pattern_offset(data, pattern)?;
+
+    let start = offset + pattern.len();
+    let end = start + length;
+
+    if end <= data.len() {
+        Some((start, end))
+    } else {
+        None
+    }
+}
+
+fn get_pattern_roffset(data: &[u8], pattern: &[u8]) -> Option<usize> {
+    data.windows(pattern.len()).rposition(|w| w == pattern)
+}
+
+fn get_roffsets(
+    data: &[u8],
+    pattern: &[u8],
+    length: usize,
+) -> Option<(usize, usize)> {
+    let offset = get_pattern_roffset(data, pattern)?;
+
+    let start = offset + pattern.len();
+    let end = start + length;
+
+    if end <= data.len() {
+        Some((start, end))
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const DATA: &'static [u8] = &[0xca, 0xfe, 0xba, 0xbe, 0xca, 0xfe];
+
+    #[test]
+    fn get_pattern_offset_none() {
+        let pattern = &[0xde, 0xad];
+        let offset = get_pattern_offset(DATA, pattern);
+        assert_eq!(offset, None);
+    }
+
+    #[test]
+    fn get_pattern_offset_some() {
+        let pattern = &DATA[0..2];
+        let offset = get_pattern_offset(DATA, pattern);
+        assert_eq!(offset, Some(0));
+    }
+
+    #[test]
+    fn get_pattern_roffset_none() {
+        let pattern = &[0xde, 0xad];
+        let offset = get_pattern_roffset(DATA, pattern);
+        assert_eq!(offset, None);
+    }
+
+    #[test]
+    fn get_pattern_roffset_some() {
+        let pattern = &DATA[0..2];
+        let offset = get_pattern_roffset(DATA, pattern);
+        assert_eq!(offset, Some(4));
+    }
 }
