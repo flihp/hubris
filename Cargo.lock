@@ -366,6 +366,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
+name = "corncobs"
+version = "0.1.1"
+source = "git+https://github.com/cbiffle/corncobs#32a7bb664f94b11b68320c60e752c73275008c98"
+
+[[package]]
 name = "cortex-m"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -648,6 +653,7 @@ name = "dice"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "corncobs",
  "dice-cert-tmpl",
  "hkdf",
  "hubpack",
