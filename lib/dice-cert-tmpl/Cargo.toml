@@ -1,0 +1,9 @@
+[package]
+name = "dice-cert-tmpl"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+call_rustfmt = { path = "../../build/call_rustfmt" }
+chrono = "0.4"
+salty = "0.2"
