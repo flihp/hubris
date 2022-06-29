@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+corncobs = { version = "0.1", git = "https://github.com/cbiffle/corncobs" }
 hkdf = { version = "0.12", default-features = false }
 hubpack = "0.1"
 lpc55-pac = "0.3"

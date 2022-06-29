@@ -15,8 +15,12 @@ use zeroize::Zeroize;
 
 mod cert;
 pub use crate::cert::{AliasCert, CertError, DeviceIdCert};
+mod csr;
+pub use crate::csr::{Csr, CsrError};
 mod handoff;
 pub use crate::handoff::{AliasHandoff, Handoff, RngHandoff};
+mod mfg;
+pub use crate::mfg::{Msg, Msgs};
 
 pub const SEED_LENGTH: usize = SECRETKEY_SEED_LENGTH;
 pub const SN_LENGTH: usize = cert_tmpl::SN_LENGTH;
@@ -269,6 +273,9 @@ impl RngSeed {
     }
 }
 
+mod csr_tmpl {
+    include!(concat!(env!("OUT_DIR"), "/csr.rs"));
+}
 mod cert_tmpl {
     include!(concat!(env!("OUT_DIR"), "/cert-self.rs"));
 }
