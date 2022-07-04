@@ -106,22 +106,6 @@ start = true
 stacksize = 1000
 task-slots = ["gpio_driver"]
 
-[tasks.usart_driver]
-name = "drv-lpc55-usart"
-priority = 4
-max-sizes = {flash = 8192, ram = 2048}
-uses = ["flexcomm0"]
-start = true
-interrupts = {"flexcomm0.irq" = 1}
-stacksize = 1000
-task-slots = ["gpio_driver", "syscon_driver"]
-
-[tasks.usart_driver.config]
-pins = [
-{ pin = { port = 0, pin = 29}, alt = 1},
-{ pin = { port = 0, pin = 30}, alt = 1}
-]
-
 [tasks.i2c_driver]
 name = "drv-lpc55-i2c"
 priority = 4
@@ -163,27 +147,17 @@ pins = [
 { pin = { port = 1, pin = 1}, alt = 5},
 ]
 
-[tasks.ping]
-name = "task-ping"
-features = ["uart"]
-priority = 6
-max-sizes = {flash = 8192, ram = 1024}
-start = true
-stacksize = 512
-task-slots = [{peer = "pong"}, "usart_driver"]
-
-[tasks.pong]
-name = "task-pong"
-priority = 5
-max-sizes = {flash = 8192, ram = 2048}
-start = true
-stacksize = 1000
-task-slots = ["user_leds"]
-
 [tasks.rot_r]
 name = "rot-r"
 priority = 5
 max-sizes = {flash = 32768, ram = 16384}
 start = true
 stacksize = 8000
-uses = ["dice_alias"]
+uses = ["dice_alias", "flexcomm0"]
+task-slots = ["gpio_driver", "syscon_driver"]
+
+[tasks.rot_r.config]
+pins = [
+{ pin = { port = 0, pin = 29}, alt = 1},
+{ pin = { port = 0, pin = 30}, alt = 1}
+]

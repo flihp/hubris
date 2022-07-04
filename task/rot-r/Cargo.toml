@@ -5,9 +5,21 @@ edition = "2021"
 
 [dependencies]
 dice = {path = "../../lib/dice"}
+drv-lpc55-gpio-api = { path = "../../drv/lpc55-gpio-api" }
+drv-lpc55-syscon-api = { path = "../../drv/lpc55-syscon-api" }
+hubpack = "0.1"
+lib-lpc55-usart = { path = "../../lib/lpc55-usart" }
+lpc55-pac = "0.3.0"
 ringbuf = {path = "../../lib/ringbuf"}
 salty = "0.2"
 userlib = {path = "../../sys/userlib", features = ["panic-messages"]}
+unwrap-lite = { path = "../../lib/unwrap-lite" }
+
+[build-dependencies]
+anyhow = "1.0.31"
+build-lpc55pins = { path = "../../build/lpc55pins" }
+build-util = { path = "../../build/util" }
+serde = "1"
 
 # This section is here to discourage RLS/rust-analyzer from doing test builds,
 # since test builds don't work for cross compilation.

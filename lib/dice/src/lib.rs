@@ -21,6 +21,7 @@ mod handoff;
 pub use crate::handoff::{AliasHandoff, Handoff, RngHandoff};
 mod mfg;
 pub use crate::mfg::{Msg, Msgs};
+pub mod serial_certs;
 
 pub const SEED_LENGTH: usize = SECRETKEY_SEED_LENGTH;
 pub const SN_LENGTH: usize = cert_tmpl::SN_LENGTH;
