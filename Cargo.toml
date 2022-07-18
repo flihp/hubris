@@ -17,6 +17,7 @@ members = [
 
     "lib/armv6m-atomic-hack",
     "lib/derive-idol-err",
+    "lib/dice",
     "lib/dice-cert-tmpl",
     "lib/fixedmap",
     "lib/gnarle",
