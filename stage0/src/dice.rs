@@ -6,7 +6,7 @@ use crate::image_header::Image;
 use core::str::FromStr;
 use dice_crate::{
     AliasCert, AliasHandoff, AliasOkm, Cdi, CdiL1, DeviceIdCert, DeviceIdOkm,
-    Handoff, SeedBuf, SerialNumber,
+    Handoff, RngHandoff, RngSeed, SeedBuf, SerialNumber,
 };
 use lpc55_pac::Peripherals;
 use salty::signature::Keypair;
@@ -86,6 +86,14 @@ pub fn run(image: &Image) {
     };
 
     handoff.alias(&alias_handoff);
+
+    let seed = RngSeed::from_cdi(&cdi);
+    let rng_handoff = RngHandoff {
+        serial_number,
+        seed,
+    };
+
+    handoff.rng(&rng_handoff);
 
     // CDI_L1 is passed to whatever task owns SWD connection to SP
 }
