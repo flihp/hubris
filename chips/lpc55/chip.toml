@@ -46,6 +46,10 @@ size = 4096
 address = 0x4003A000
 size = 4096
 
+[dice_alias]
+address = 0x40100000
+size = 0x800
+
 [flash]
 address = 0x50034000
 size = 0x1000
