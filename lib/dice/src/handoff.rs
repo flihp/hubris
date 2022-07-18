@@ -4,7 +4,7 @@
 
 use crate::{
     cert::{AliasCert, DeviceIdCert},
-    AliasOkm,
+    AliasOkm, RngSeed, SerialNumber,
 };
 use hubpack::SerializedSize;
 use lpc55_pac::syscon::RegisterBlock;
@@ -13,7 +13,10 @@ use serde::{Deserialize, Serialize};
 // Currently this memory is the USB peripheral SRAM.
 // Do not exceed 0x3fff bytes.
 const MEM_START: usize = 0x4010_0000;
+
+// layout of artifacts in handoff memory
 const ALIAS_START: usize = MEM_START;
+const RNG_START: usize = ALIAS_START + 0x800;
 
 pub struct Handoff<'a>(&'a RegisterBlock);
 
@@ -42,6 +45,14 @@ impl<'a> Handoff<'a> {
         // TODO: error handling
         hubpack::serialize(dst, alias_handoff).expect("serialize rng-handoff")
     }
+
+    pub fn rng(&self, rng_handoff: &RngHandoff) -> usize {
+        let dst_ptr = RNG_START as *mut [u8; RngHandoff::MAX_SIZE];
+        let dst: &mut [u8] = unsafe { &mut *dst_ptr };
+
+        // TODO: error handling
+        hubpack::serialize(dst, rng_handoff).expect("serialize rng-handoff")
+    }
 }
 
 // Type to access the memory region use to hand DICE derived artifacts off
@@ -57,6 +68,26 @@ pub struct AliasHandoff {
 impl AliasHandoff {
     pub fn from_mem() -> Self {
         let src_ptr = ALIAS_START as *const [u8; AliasHandoff::MAX_SIZE];
+        let src: &[u8] = unsafe { &*src_ptr };
+
+        let (msg, _) = hubpack::deserialize::<Self>(src).expect("deserialize");
+
+        msg
+    }
+}
+
+// Type to access the memory region use to hand DICE derived artifacts off
+// to the RNG. This will probably only be used by the LPC55 RNG:
+// https://rfd.shared.oxide.computer/rfd/0277
+#[derive(Deserialize, Serialize, SerializedSize)]
+pub struct RngHandoff {
+    pub serial_number: SerialNumber,
+    pub seed: RngSeed,
+}
+
+impl RngHandoff {
+    pub fn from_mem() -> Self {
+        let src_ptr = RNG_START as *const [u8; RngHandoff::MAX_SIZE];
         let src: &[u8] = unsafe { &*src_ptr };
 
         let (msg, _) = hubpack::deserialize::<Self>(src).expect("deserialize");

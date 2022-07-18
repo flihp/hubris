@@ -16,7 +16,7 @@ use zeroize::Zeroize;
 mod cert;
 pub use crate::cert::{AliasCert, CertError, DeviceIdCert};
 mod handoff;
-pub use crate::handoff::{AliasHandoff, Handoff};
+pub use crate::handoff::{AliasHandoff, Handoff, RngHandoff};
 
 pub const SEED_LENGTH: usize = SECRETKEY_SEED_LENGTH;
 pub const SN_LENGTH: usize = cert_tmpl::SN_LENGTH;
@@ -252,6 +252,20 @@ impl SeedBuf for AliasOkm {
 impl AliasOkm {
     pub fn from_cdi(cdi: &CdiL1) -> Self {
         Self(okm_from_seed_no_extract(cdi, "attestation".as_bytes()))
+    }
+}
+
+#[derive(Deserialize, Serialize, SerializedSize, Zeroize)]
+#[zeroize(drop)]
+pub struct RngSeed([u8; SEED_LENGTH]);
+
+impl RngSeed {
+    pub fn from_cdi(cdi: &Cdi) -> Self {
+        Self(okm_from_seed_no_extract(cdi, "rng-seed".as_bytes()))
+    }
+
+    pub fn as_bytes(&self) -> &[u8; SEED_LENGTH] {
+        &self.0
     }
 }
 
