@@ -3348,6 +3348,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "task-uartspew"
+version = "0.1.0"
+dependencies = [
+ "ringbuf",
+ "userlib",
+]
+
+[[package]]
 name = "task-udpbroadcast"
 version = "0.1.0"
 dependencies = [

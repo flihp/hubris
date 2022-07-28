@@ -81,6 +81,14 @@ pins = [
 { pin = { port = 0, pin = 30}, alt = 1}
 ]
 
+[tasks.uartspew]
+name = "task-uartspew"
+priority = 5
+max-sizes = {flash = 8192, ram = 2048}
+start = true
+stacksize = 512
+task-slots = ["usart_driver"]
+
 [tasks.spi0_driver]
 name = "drv-lpc55-spi-server"
 priority = 4
