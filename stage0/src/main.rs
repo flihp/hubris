@@ -21,6 +21,11 @@ mod image_header;
 
 use crate::image_header::Image;
 
+mod usart;
+use core::ops::Deref;
+use lib_lpc55_usart::Usart;
+use unwrap_lite::UnwrapLite;
+
 /// Initial entry point for handling a memory management fault.
 #[allow(non_snake_case)]
 #[no_mangle]
@@ -172,6 +177,30 @@ fn main() -> ! {
     }
 
     check_system_freq();
+
+    let peripherals = lpc55_pac::Peripherals::take().unwrap_lite();
+    usart::setup(
+        &peripherals.SYSCON,
+        &peripherals.IOCON,
+        &peripherals.FLEXCOMM0,
+    );
+
+    let mut usart = Usart::from(peripherals.USART0.deref());
+
+    let mut buf = [0u8; 256];
+    // sort out serial errors before doing mfg deviceid cert signing
+    usart::calibrate(&mut usart, &mut buf);
+
+    //loop {
+    //    usart::write_all(&mut usart, "fml\r\n".as_bytes());
+    //    usart::flush_all(&mut usart);
+    //}
+
+    usart::teardown(
+        &peripherals.SYSCON,
+        &peripherals.IOCON,
+        &peripherals.FLEXCOMM0,
+    );
 
     let imagea = match image_header::get_image_a() {
         Some(a) => a,
