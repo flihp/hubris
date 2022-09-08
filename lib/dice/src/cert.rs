@@ -29,7 +29,6 @@ pub enum CertError {
 
 pub trait Cert {
     fn as_bytes(&self) -> &[u8];
-    fn as_mut_bytes(&mut self) -> &mut [u8];
 
     fn read_range<'a, T>(&'a self, r: Range<usize>) -> T
     where
@@ -38,16 +37,52 @@ pub trait Cert {
         self.as_bytes()[r].try_into().unwrap_lite()
     }
 
-    fn write_range<T: AsBytes>(&mut self, r: Range<usize>, t: &T) {
-        self.as_mut_bytes()[r].copy_from_slice(t.as_bytes())
-    }
-
     const SERIAL_NUMBER_RANGE: Range<usize>;
 
     fn get_serial_number(&self) -> CertSerialNumber {
         let csn: [u8; 1] = self.read_range(Self::SERIAL_NUMBER_RANGE);
         CertSerialNumber::new(csn[0])
     }
+
+    const ISSUER_SN_RANGE: Range<usize>;
+
+    fn get_issuer_sn(&self) -> SerialNumber {
+        SerialNumber::from_bytes(self.read_range(Self::ISSUER_SN_RANGE))
+    }
+
+    const SUBJECT_SN_RANGE: Range<usize>;
+
+    fn get_subject_sn(&self) -> SerialNumber {
+        SerialNumber::from_bytes(self.read_range(Self::SUBJECT_SN_RANGE))
+    }
+
+    const PUB_RANGE: Range<usize>;
+
+    fn get_pub(&self) -> &[u8] {
+        self.read_range(Self::PUB_RANGE)
+    }
+
+    const SIG_RANGE: Range<usize>;
+
+    fn get_sig(&self) -> &[u8] {
+        self.read_range(Self::SIG_RANGE)
+    }
+
+    const SIGNDATA_RANGE: Range<usize>;
+
+    fn get_signdata(&self) -> &[u8] {
+        self.read_range(Self::SIGNDATA_RANGE)
+    }
+}
+
+pub trait CertBuilder {
+    fn as_mut_bytes(&mut self) -> &mut [u8];
+
+    fn write_range<T: AsBytes>(&mut self, r: Range<usize>, t: &T) {
+        self.as_mut_bytes()[r].copy_from_slice(t.as_bytes())
+    }
+
+    const SERIAL_NUMBER_RANGE: Range<usize>;
 
     fn set_serial_number(mut self, sn: &CertSerialNumber) -> Self
     where
@@ -60,10 +95,6 @@ pub trait Cert {
 
     const ISSUER_SN_RANGE: Range<usize>;
 
-    fn get_issuer_sn(&self) -> SerialNumber {
-        SerialNumber::from_bytes(self.read_range(Self::ISSUER_SN_RANGE))
-    }
-
     fn set_issuer_sn(mut self, sn: &SerialNumber) -> Self
     where
         Self: Sized,
@@ -74,10 +105,6 @@ pub trait Cert {
     }
 
     const SUBJECT_SN_RANGE: Range<usize>;
-
-    fn get_subject_sn(&self) -> SerialNumber {
-        SerialNumber::from_bytes(self.read_range(Self::SUBJECT_SN_RANGE))
-    }
 
     fn set_subject_sn(mut self, sn: &SerialNumber) -> Self
     where
@@ -90,10 +117,6 @@ pub trait Cert {
 
     const PUB_RANGE: Range<usize>;
 
-    fn get_pub(&self) -> &[u8] {
-        self.read_range(Self::PUB_RANGE)
-    }
-
     fn set_pub(mut self, pubkey: &[u8; PUBLICKEY_SERIALIZED_LENGTH]) -> Self
     where
         Self: Sized,
@@ -105,10 +128,6 @@ pub trait Cert {
 
     const SIG_RANGE: Range<usize>;
 
-    fn get_sig(&self) -> &[u8] {
-        self.read_range(Self::SIG_RANGE)
-    }
-
     fn set_sig(mut self, sig: &[u8; SIGNATURE_SERIALIZED_LENGTH]) -> Self
     where
         Self: Sized,
@@ -117,21 +136,47 @@ pub trait Cert {
 
         self
     }
+}
 
-    const SIGNDATA_RANGE: Range<usize>;
+pub struct DeviceIdSelfCertBuilder([u8; deviceid_cert_tmpl::SIZE]);
 
-    fn get_signdata(&self) -> &[u8] {
-        self.read_range(Self::SIGNDATA_RANGE)
+impl DeviceIdSelfCertBuilder {
+    pub fn new(
+        cert_sn: &CertSerialNumber,
+        dname_sn: &SerialNumber,
+        public_key: &PublicKey,
+    ) -> Self {
+        Self(deviceid_cert_tmpl::CERT_TMPL.clone())
+            .set_serial_number(cert_sn)
+            .set_issuer_sn(dname_sn)
+            .set_subject_sn(dname_sn)
+            .set_pub(public_key.as_bytes())
     }
 
-    fn sign(self, keypair: &Keypair) -> Self
+    const SIGNDATA_RANGE: Range<usize> = deviceid_cert_tmpl::SIGNDATA_RANGE;
+
+    pub fn sign(self, keypair: &Keypair) -> DeviceIdSelfCert
     where
         Self: Sized,
     {
-        let signdata = self.get_signdata();
+        let signdata = &self.0[Self::SIGNDATA_RANGE];
         let sig = keypair.sign(signdata);
+        let tmp = self.set_sig(&sig.to_bytes());
 
-        self.set_sig(&sig.to_bytes())
+        DeviceIdSelfCert(tmp.0)
+    }
+}
+
+impl CertBuilder for DeviceIdSelfCertBuilder {
+    const SERIAL_NUMBER_RANGE: Range<usize> =
+        deviceid_cert_tmpl::SERIAL_NUMBER_RANGE;
+    const ISSUER_SN_RANGE: Range<usize> = deviceid_cert_tmpl::ISSUER_SN_RANGE;
+    const SUBJECT_SN_RANGE: Range<usize> = deviceid_cert_tmpl::SUBJECT_SN_RANGE;
+    const PUB_RANGE: Range<usize> = deviceid_cert_tmpl::PUB_RANGE;
+    const SIG_RANGE: Range<usize> = deviceid_cert_tmpl::SIG_RANGE;
+
+    fn as_mut_bytes(&mut self) -> &mut [u8] {
+        &mut self.0
     }
 }
 
@@ -139,21 +184,6 @@ pub trait Cert {
 pub struct DeviceIdSelfCert(
     #[serde(with = "BigArray")] [u8; deviceid_cert_tmpl::SIZE],
 );
-
-impl DeviceIdSelfCert {
-    pub fn new(
-        cert_sn: &CertSerialNumber,
-        dname_sn: &SerialNumber,
-        keypair: &Keypair,
-    ) -> Self {
-        Self(deviceid_cert_tmpl::CERT_TMPL.clone())
-            .set_serial_number(cert_sn)
-            .set_issuer_sn(dname_sn)
-            .set_subject_sn(dname_sn)
-            .set_pub(keypair.public.as_bytes())
-            .sign(keypair)
-    }
-}
 
 impl Cert for DeviceIdSelfCert {
     const SERIAL_NUMBER_RANGE: Range<usize> =
@@ -167,6 +197,55 @@ impl Cert for DeviceIdSelfCert {
     fn as_bytes(&self) -> &[u8] {
         &self.0
     }
+}
+
+pub struct AliasCertBuilder([u8; alias_cert_tmpl::SIZE]);
+
+impl AliasCertBuilder {
+    const FWID_LENGTH: usize =
+        alias_cert_tmpl::FWID_RANGE.end - alias_cert_tmpl::FWID_RANGE.start;
+
+    pub fn new(
+        cert_sn: &CertSerialNumber,
+        dname_sn: &SerialNumber,
+        public_key: &PublicKey,
+        fwid: &[u8; Self::FWID_LENGTH],
+    ) -> Self {
+        Self(alias_cert_tmpl::CERT_TMPL.clone())
+            .set_serial_number(cert_sn)
+            .set_issuer_sn(dname_sn)
+            .set_subject_sn(dname_sn)
+            .set_pub(public_key.as_bytes())
+            .set_fwid(fwid)
+    }
+
+    pub fn set_fwid(mut self, fwid: &[u8; Self::FWID_LENGTH]) -> Self {
+        self.write_range(alias_cert_tmpl::FWID_RANGE, fwid);
+
+        self
+    }
+
+    const SIGNDATA_RANGE: Range<usize> = alias_cert_tmpl::SIGNDATA_RANGE;
+
+    pub fn sign(self, keypair: &Keypair) -> AliasCert
+    where
+        Self: Sized,
+    {
+        let signdata = &self.0[Self::SIGNDATA_RANGE];
+        let sig = keypair.sign(signdata);
+        let tmp = self.set_sig(&sig.to_bytes());
+
+        AliasCert(tmp.0)
+    }
+}
+
+impl CertBuilder for AliasCertBuilder {
+    const SERIAL_NUMBER_RANGE: Range<usize> =
+        alias_cert_tmpl::SERIAL_NUMBER_RANGE;
+    const ISSUER_SN_RANGE: Range<usize> = alias_cert_tmpl::ISSUER_SN_RANGE;
+    const SUBJECT_SN_RANGE: Range<usize> = alias_cert_tmpl::SUBJECT_SN_RANGE;
+    const PUB_RANGE: Range<usize> = alias_cert_tmpl::PUB_RANGE;
+    const SIG_RANGE: Range<usize> = alias_cert_tmpl::SIG_RANGE;
 
     fn as_mut_bytes(&mut self) -> &mut [u8] {
         &mut self.0
@@ -177,31 +256,6 @@ impl Cert for DeviceIdSelfCert {
 pub struct AliasCert(#[serde(with = "BigArray")] [u8; alias_cert_tmpl::SIZE]);
 
 impl AliasCert {
-    const FWID_LENGTH: usize =
-        alias_cert_tmpl::FWID_RANGE.end - alias_cert_tmpl::FWID_RANGE.start;
-
-    pub fn new(
-        cert_sn: &CertSerialNumber,
-        dname_sn: &SerialNumber,
-        public_key: &PublicKey,
-        fwid: &[u8; Self::FWID_LENGTH],
-        keypair: &Keypair,
-    ) -> Self {
-        Self(alias_cert_tmpl::CERT_TMPL.clone())
-            .set_serial_number(cert_sn)
-            .set_issuer_sn(dname_sn)
-            .set_subject_sn(dname_sn)
-            .set_pub(public_key.as_bytes())
-            .set_fwid(fwid)
-            .sign(keypair)
-    }
-
-    pub fn set_fwid(mut self, fwid: &[u8; Self::FWID_LENGTH]) -> Self {
-        self.write_range(alias_cert_tmpl::FWID_RANGE, fwid);
-
-        self
-    }
-
     pub fn get_fwid(&self) -> &[u8] {
         self.read_range(alias_cert_tmpl::FWID_RANGE)
     }
@@ -218,10 +272,6 @@ impl Cert for AliasCert {
 
     fn as_bytes(&self) -> &[u8] {
         &self.0
-    }
-
-    fn as_mut_bytes(&mut self) -> &mut [u8] {
-        &mut self.0
     }
 }
 
