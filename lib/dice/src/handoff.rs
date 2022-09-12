@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use crate::{AliasCert, AliasOkm, DeviceIdSelfCert};
+use crate::{AliasCert, AliasOkm, DeviceIdSelfCert, SwdspCert, SwdspOkm};
 use hubpack::SerializedSize;
 use lpc55_pac::syscon::RegisterBlock;
 use serde::{Deserialize, Serialize};
@@ -13,6 +13,24 @@ use serde::{Deserialize, Serialize};
 // TODO: get from app.toml -> chip.toml at build time
 const MEM_START: usize = 0x4010_0000;
 const ALIAS_START: usize = MEM_START;
+const ALIAS_SIZE: usize = 0x800;
+const SWDSP_START: usize = ALIAS_START + ALIAS_SIZE;
+
+// Want to parameterize the unsafe cast from raw pointer & serialization
+// from the 'Data' type.
+pub fn slice_from_parts(start: usize, size: usize) -> &'static mut [u8] {
+    // SAFETY: Dereferencing this raw pointer is necessary to write to the
+    // memory region used to handoff DICE artifacts to Hubris tasks. This
+    // pointer will references a valid memory region provided two
+    // conditions are met:
+    // 1) The associated memory region has been enabled / turned on if
+    // necessary. This happens in the constructor / 'turn_on' function.
+    // 2) The function call is made by code sufficintly privileged to
+    // access the memory region (e.g. stage0).
+    // If these conditions aren't met this access is still safe but a fault
+    // will occur.
+    unsafe { core::slice::from_raw_parts_mut(start as *mut u8, size) }
+}
 
 /// The Handoff type is a thin wrapper over the memory region used to transfer
 /// DICE artifacts (seeds & certs) from stage0 to hubris tasks. It is intended
@@ -38,26 +56,16 @@ impl<'a> Handoff<'a> {
         self.0.ahbclkctrl2.modify(|_, w| w.usb1_ram().disable());
     }
 
-    pub fn store(&self, alias_data: &AliasData) -> usize {
-        // SAFETY: Dereferencing this raw pointer is necessary to write to the
-        // memory region used to handoff DICE artifacts to Hubris tasks. This
-        // pointer will references a valid memory region provided two
-        // conditions are met:
-        // 1) The associated memory region has been enabled / turned on if
-        // necessary. This happens in the constructor / 'turn_on' function.
-        // 2) The function call is made by code sufficintly privileged to
-        // access the memory region (e.g. stage0).
-        // If these conditions aren't met this access is still safe but a fault
-        // will occur.
-        let dst: &mut [u8] = unsafe {
-            core::slice::from_raw_parts_mut(
-                ALIAS_START as *mut u8,
-                AliasData::MAX_SIZE,
-            )
-        };
-
+    pub fn store_alias(&self, data: &AliasData) -> usize {
+        let dst = slice_from_parts(ALIAS_START, AliasData::MAX_SIZE);
         // TODO: error handling
-        hubpack::serialize(dst, alias_data).expect("serialize alias-handoff")
+        hubpack::serialize(dst, data).expect("serialize alias-handoff")
+    }
+
+    pub fn store_swdsp(&self, data: &SwdspData) -> usize {
+        let dst = slice_from_parts(SWDSP_START, SwdspData::MAX_SIZE);
+        // TODO: error handling
+        hubpack::serialize(dst, data).expect("serialize alias-handoff")
     }
 }
 
@@ -113,6 +121,67 @@ impl AliasData {
         };
 
         // pull AliasData from memory, deserialization will succeed even if
+        // memory is all 0's
+        match hubpack::deserialize::<Self>(src).ok() {
+            Some((data, _)) => {
+                if data.magic == Self::MAGIC {
+                    Some(data)
+                } else {
+                    None
+                }
+            }
+            None => None,
+        }
+    }
+}
+
+/// Type to hold the DICE artifacts used by the task that controls the SWD
+/// interface to the service processor.
+#[derive(Deserialize, Serialize, SerializedSize)]
+pub struct SwdspData {
+    pub magic: [u8; 16],
+    pub seed: SwdspOkm,
+    pub swdsp_cert: SwdspCert,
+    pub deviceid_cert: DeviceIdSelfCert,
+}
+
+impl SwdspData {
+    const MAGIC: [u8; 16] = [
+        0xec, 0x4a, 0xc2, 0x1c, 0xb5, 0xaa, 0x5b, 0x34, 0x47, 0x84, 0x96, 0x4a,
+        0x0a, 0x55, 0x54, 0x37,
+    ];
+
+    pub fn new(
+        seed: SwdspOkm,
+        swdsp_cert: SwdspCert,
+        deviceid_cert: DeviceIdSelfCert,
+    ) -> Self {
+        Self {
+            magic: Self::MAGIC,
+            seed,
+            swdsp_cert,
+            deviceid_cert,
+        }
+    }
+    pub fn from_mem() -> Option<Self> {
+        // SAFETY: Dereferencing this raw pointer is necessary to read from the
+        // memory region used to transfer the Swdsp DICE artifacts from stage0
+        // to a Hubris task. This pointer will reference a valid memory region
+        // provided two conditions are met:
+        // 1) The associated memory region has been enabled / turned on if
+        // necessary. This should be done by code in stage0.
+        // 2) The task making the call has been granted access to the memory
+        // region by the kernel.
+        // If these conditions aren't met this access is still safe but a fault
+        // will occur.
+        let src: &[u8] = unsafe {
+            core::slice::from_raw_parts(
+                SWDSP_START as *const u8,
+                SwdspData::MAX_SIZE,
+            )
+        };
+
+        // pull SwdspData from memory, deserialization will succeed even if
         // memory is all 0's
         match hubpack::deserialize::<Self>(src).ok() {
             Some((data, _)) => {
