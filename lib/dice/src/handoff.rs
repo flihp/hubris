@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::{
-    AliasCert, AliasOkm, DeviceIdSelfCert, RngSeed, SpMeasureCert,
-    SpMeasureOkm, TrustQuorumDheCert, TrustQuorumDheOkm,
+    AliasCert, AliasOkm, CertBlob, RngSeed, SpMeasureCert, SpMeasureOkm,
+    TrustQuorumDheCert, TrustQuorumDheOkm,
 };
 use hubpack::SerializedSize;
 use lpc55_pac::syscon::RegisterBlock;
@@ -17,9 +17,9 @@ use static_assertions as sa;
 // TODO: get from app.toml -> chip.toml at build time
 const MEM_START: usize = 0x4010_0000;
 const ALIAS_START: usize = MEM_START;
-const ALIAS_SIZE: usize = 0x800;
+const ALIAS_SIZE: usize = 0x1000;
 const SPMEASURE_START: usize = ALIAS_START + ALIAS_SIZE;
-const SPMEASURE_SIZE: usize = 0x800;
+const SPMEASURE_SIZE: usize = 0x1000;
 const RNG_START: usize = SPMEASURE_START + SPMEASURE_SIZE;
 const RNG_SIZE: usize = 0x100;
 
@@ -114,7 +114,7 @@ pub struct AliasData {
     pub alias_cert: AliasCert,
     pub tqdhe_seed: TrustQuorumDheOkm,
     pub tqdhe_cert: TrustQuorumDheCert,
-    pub deviceid_cert: DeviceIdSelfCert,
+    pub cert_blob: CertBlob,
 }
 
 impl HandoffData for AliasData {
@@ -140,7 +140,7 @@ impl AliasData {
         alias_cert: AliasCert,
         tqdhe_seed: TrustQuorumDheOkm,
         tqdhe_cert: TrustQuorumDheCert,
-        deviceid_cert: DeviceIdSelfCert,
+        cert_blob: CertBlob,
     ) -> Self {
         Self {
             magic: Self::EXPECTED_MAGIC,
@@ -148,7 +148,7 @@ impl AliasData {
             alias_cert,
             tqdhe_seed,
             tqdhe_cert,
-            deviceid_cert,
+            cert_blob,
         }
     }
 }
@@ -160,7 +160,7 @@ pub struct SpMeasureData {
     pub magic: [u8; 16],
     pub seed: SpMeasureOkm,
     pub spmeasure_cert: SpMeasureCert,
-    pub deviceid_cert: DeviceIdSelfCert,
+    pub cert_blob: CertBlob,
 }
 
 impl HandoffData for SpMeasureData {
@@ -186,13 +186,13 @@ impl SpMeasureData {
     pub fn new(
         seed: SpMeasureOkm,
         spmeasure_cert: SpMeasureCert,
-        deviceid_cert: DeviceIdSelfCert,
+        cert_blob: CertBlob,
     ) -> Self {
         Self {
             magic: Self::EXPECTED_MAGIC,
             seed,
             spmeasure_cert,
-            deviceid_cert,
+            cert_blob,
         }
     }
 }

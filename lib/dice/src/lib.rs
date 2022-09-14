@@ -23,7 +23,7 @@ mod alias_cert_tmpl;
 mod deviceid_cert_tmpl;
 mod handoff;
 mod mfg;
-pub use crate::mfg::{DeviceIdSelfMfg, DiceMfgRunner};
+pub use crate::mfg::{CertBlob, DeviceIdSelfMfg, DiceMfgRunner};
 mod spmeasure_cert_tmpl;
 mod trust_quorum_dhe_cert_tmpl;
 pub use crate::handoff::{
