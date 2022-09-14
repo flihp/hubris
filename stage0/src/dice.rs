@@ -3,11 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::image_header::Image;
-use core::str::FromStr;
 use dice_crate::{
-    AliasCertBuilder, AliasData, AliasOkm, Cdi, CdiL1, CertSerialNumber,
-    DeviceIdOkm, DeviceIdSelfCertBuilder, Handoff, RngData, RngSeed, SeedBuf,
-    SerialNumber, SpMeasureCertBuilder, SpMeasureData, SpMeasureOkm,
+    AliasCertBuilder, AliasData, AliasOkm, Cdi, CdiL1, DeviceIdOkm,
+    DeviceIdSelfMfg, DiceMfgRunner, Handoff, RngData, RngSeed, SeedBuf,
+    SpMeasureCertBuilder, SpMeasureData, SpMeasureOkm,
     TrustQuorumDheCertBuilder, TrustQuorumDheOkm,
 };
 use lpc55_pac::Peripherals;
@@ -19,12 +18,6 @@ fn get_deviceid_keypair(cdi: &Cdi) -> Keypair {
     let devid_okm = DeviceIdOkm::from_cdi(cdi);
 
     Keypair::from(devid_okm.as_bytes())
-}
-
-// TODO: get the legit SN from somewhere
-// https://github.com/oxidecomputer/hubris/issues/734
-fn get_serial_number() -> SerialNumber {
-    SerialNumber::from_str("0123456789ab").expect("SerialNumber::from_str")
 }
 
 pub fn run(image: &Image) {
@@ -40,16 +33,10 @@ pub fn run(image: &Image) {
         None => return,
     };
 
-    let dname_sn = get_serial_number();
     let deviceid_keypair = get_deviceid_keypair(&cdi);
-    let mut cert_sn = CertSerialNumber::default();
 
-    let deviceid_cert = DeviceIdSelfCertBuilder::new(
-        &cert_sn.next(),
-        &dname_sn,
-        &deviceid_keypair.public,
-    )
-    .sign(&deviceid_keypair);
+    // TODO: persistent storage
+    let mut dice_state = DeviceIdSelfMfg::run(&deviceid_keypair);
 
     // Collect hash(es) of TCB. The first TCB Component Identifier (TCI)
     // calculated is the Hubris image. The DICE specs call this collection
@@ -70,8 +57,8 @@ pub fn run(image: &Image) {
     let alias_keypair = Keypair::from(alias_okm.as_bytes());
 
     let alias_cert = AliasCertBuilder::new(
-        &cert_sn.next(),
-        &dname_sn,
+        &dice_state.cert_serial_number.next(),
+        &dice_state.serial_number,
         &alias_keypair.public,
         fwid.as_ref(),
     )
@@ -81,8 +68,8 @@ pub fn run(image: &Image) {
     let tqdhe_keypair = Keypair::from(tqdhe_okm.as_bytes());
 
     let tqdhe_cert = TrustQuorumDheCertBuilder::new(
-        &cert_sn.next(),
-        &dname_sn,
+        &dice_state.cert_serial_number.next(),
+        &dice_state.serial_number,
         &tqdhe_keypair.public,
         fwid.as_ref(),
     )
@@ -93,7 +80,7 @@ pub fn run(image: &Image) {
         alias_cert,
         tqdhe_okm,
         tqdhe_cert,
-        deviceid_cert.clone(),
+        dice_state.deviceid_cert.clone(),
     );
 
     handoff.store(&alias_data);
@@ -102,8 +89,8 @@ pub fn run(image: &Image) {
     let spmeasure_keypair = Keypair::from(spmeasure_okm.as_bytes());
 
     let spmeasure_cert = SpMeasureCertBuilder::new(
-        &cert_sn.next(),
-        &dname_sn,
+        &dice_state.cert_serial_number.next(),
+        &dice_state.serial_number,
         &spmeasure_keypair.public,
         fwid.as_ref(),
     )
@@ -112,7 +99,7 @@ pub fn run(image: &Image) {
     let spmeasure_data = SpMeasureData::new(
         spmeasure_okm,
         spmeasure_cert,
-        deviceid_cert.clone(),
+        dice_state.deviceid_cert.clone(),
     );
 
     handoff.store(&spmeasure_data);
