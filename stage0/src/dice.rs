@@ -3,11 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::image_header::Image;
-use core::str::FromStr;
 use dice_crate::{
-    AliasCertBuilder, AliasData, AliasOkm, Cdi, CdiL1, CertSerialNumber,
-    DeviceIdOkm, DeviceIdSelfCertBuilder, Handoff, SeedBuf, SerialNumber,
-    SwdspCertBuilder, SwdspData, SwdspOkm,
+    AliasCertBuilder, AliasData, AliasOkm, Cdi, CdiL1, DeviceIdOkm,
+    DeviceIdSelfMfg, DiceMfgRunner, Handoff, SeedBuf, SwdspCertBuilder,
+    SwdspData, SwdspOkm,
 };
 use lpc55_pac::Peripherals;
 use salty::signature::Keypair;
@@ -18,12 +17,6 @@ fn get_deviceid_keypair(cdi: &Cdi) -> Keypair {
     let devid_okm = DeviceIdOkm::from_cdi(cdi);
 
     Keypair::from(devid_okm.as_bytes())
-}
-
-// TODO: get the legit SN from somewhere
-// https://github.com/oxidecomputer/hubris/issues/734
-fn get_serial_number() -> SerialNumber {
-    SerialNumber::from_str("0123456789ab").expect("SerialNumber::from_str")
 }
 
 pub fn run(image: &Image) {
@@ -39,16 +32,10 @@ pub fn run(image: &Image) {
         None => return,
     };
 
-    let dname_sn = get_serial_number();
     let deviceid_keypair = get_deviceid_keypair(&cdi);
-    let mut cert_sn = CertSerialNumber::default();
 
-    let deviceid_cert = DeviceIdSelfCertBuilder::new(
-        &cert_sn.next(),
-        &dname_sn,
-        &deviceid_keypair.public,
-    )
-    .sign(&deviceid_keypair);
+    // TODO: persistent storage
+    let mut dice_state = DeviceIdSelfMfg::run(&deviceid_keypair);
 
     // Collect hash(es) of TCB. The first TCB Component Identifier (TCI)
     // calculated is the Hubris image. The DICE specs call this collection
@@ -69,15 +56,15 @@ pub fn run(image: &Image) {
     let alias_keypair = Keypair::from(alias_okm.as_bytes());
 
     let alias_cert = AliasCertBuilder::new(
-        &cert_sn.next(),
-        &dname_sn,
+        &dice_state.cert_serial_number.next(),
+        &dice_state.serial_number,
         &alias_keypair.public,
         fwid.as_ref(),
     )
     .sign(&deviceid_keypair);
 
     let alias_data =
-        AliasData::new(alias_okm, alias_cert, deviceid_cert.clone());
+        AliasData::new(alias_okm, alias_cert, dice_state.deviceid_cert.clone());
 
     handoff.store_alias(&alias_data);
 
@@ -85,15 +72,15 @@ pub fn run(image: &Image) {
     let swdsp_keypair = Keypair::from(swdsp_okm.as_bytes());
 
     let swdsp_cert = SwdspCertBuilder::new(
-        &cert_sn.next(),
-        &dname_sn,
+        &dice_state.cert_serial_number.next(),
+        &dice_state.serial_number,
         &swdsp_keypair.public,
         fwid.as_ref(),
     )
     .sign(&deviceid_keypair);
 
     let swdsp_data =
-        SwdspData::new(swdsp_okm, swdsp_cert, deviceid_cert.clone());
+        SwdspData::new(swdsp_okm, swdsp_cert, dice_state.deviceid_cert.clone());
 
     handoff.store_swdsp(&swdsp_data);
 }
