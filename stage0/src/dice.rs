@@ -80,7 +80,7 @@ pub fn run(image: &Image) {
         alias_cert,
         tqdhe_okm,
         tqdhe_cert,
-        dice_state.cert.clone(),
+        dice_state.cert_chain.clone(),
     );
 
     handoff.store(&alias_data);
@@ -99,7 +99,7 @@ pub fn run(image: &Image) {
     let spmeasure_data = SpMeasureData::new(
         spmeasure_okm,
         spmeasure_cert,
-        dice_state.cert.clone(),
+        dice_state.cert_chain.clone(),
     );
 
     handoff.store(&spmeasure_data);

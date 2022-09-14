@@ -36,11 +36,11 @@ impl<T: Cert> From<T> for CertBlob {
     }
 }
 
-//#[derive(Clone, Deserialize, Serialize, SerializedSize)]
-//pub struct CertChain {
-//    pub device_id: CertBlob,
-//    pub intermediate: CertBlob,
-//}
+#[derive(Clone, Deserialize, Serialize, SerializedSize)]
+pub struct CertChain {
+    pub device_id: CertBlob,
+    pub intermediate: CertBlob,
+}
 
 // data returned to caller by MFG
 // typically required to use ECA post MFG
@@ -48,7 +48,7 @@ impl<T: Cert> From<T> for CertBlob {
 pub struct DiceState {
     pub cert_serial_number: CertSerialNumber,
     pub serial_number: SerialNumber,
-    pub cert: CertBlob,
+    pub cert_chain: CertChain,
 }
 
 // Trait defining our interface to the "manufacturing process".
@@ -76,7 +76,10 @@ impl DiceMfgRunner for DeviceIdSelfMfg {
         DiceState {
             cert_serial_number: cert_sn,
             serial_number: dname_sn,
-            cert: CertBlob::from(deviceid_cert),
+            cert_chain: CertChain {
+                device_id: CertBlob::from(deviceid_cert),
+                intermediate: CertBlob::default(),
+            },
         }
     }
 }

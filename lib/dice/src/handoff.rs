@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::{
-    AliasCert, AliasOkm, CertBlob, RngSeed, SpMeasureCert, SpMeasureOkm,
+    AliasCert, AliasOkm, CertChain, RngSeed, SpMeasureCert, SpMeasureOkm,
     TrustQuorumDheCert, TrustQuorumDheOkm,
 };
 use hubpack::SerializedSize;
@@ -114,7 +114,7 @@ pub struct AliasData {
     pub alias_cert: AliasCert,
     pub tqdhe_seed: TrustQuorumDheOkm,
     pub tqdhe_cert: TrustQuorumDheCert,
-    pub cert_blob: CertBlob,
+    pub cert_chain: CertChain,
 }
 
 impl HandoffData for AliasData {
@@ -140,7 +140,7 @@ impl AliasData {
         alias_cert: AliasCert,
         tqdhe_seed: TrustQuorumDheOkm,
         tqdhe_cert: TrustQuorumDheCert,
-        cert_blob: CertBlob,
+        cert_chain: CertChain,
     ) -> Self {
         Self {
             magic: Self::EXPECTED_MAGIC,
@@ -148,7 +148,7 @@ impl AliasData {
             alias_cert,
             tqdhe_seed,
             tqdhe_cert,
-            cert_blob,
+            cert_chain,
         }
     }
 }
@@ -160,7 +160,7 @@ pub struct SpMeasureData {
     pub magic: [u8; 16],
     pub seed: SpMeasureOkm,
     pub spmeasure_cert: SpMeasureCert,
-    pub cert_blob: CertBlob,
+    pub cert_chain: CertChain,
 }
 
 impl HandoffData for SpMeasureData {
@@ -186,13 +186,13 @@ impl SpMeasureData {
     pub fn new(
         seed: SpMeasureOkm,
         spmeasure_cert: SpMeasureCert,
-        cert_blob: CertBlob,
+        cert_chain: CertChain,
     ) -> Self {
         Self {
             magic: Self::EXPECTED_MAGIC,
             seed,
             spmeasure_cert,
-            cert_blob,
+            cert_chain,
         }
     }
 }
