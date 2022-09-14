@@ -5,9 +5,16 @@
 use crate::image_header::Image;
 use dice_crate::{
     AliasCertBuilder, AliasData, AliasOkm, Cdi, CdiL1, DeviceIdOkm,
-    DeviceIdSelfMfg, DiceMfgRunner, Handoff, SeedBuf, SwdspCertBuilder,
+    DiceMfgRunner, Handoff, SeedBuf, SwdspCertBuilder,
     SwdspData, SwdspOkm,
 };
+cfg_if::cfg_if! {
+    if #[cfg(feature = "dice-mfg")] {
+        use dice_crate::DeviceIdSelfMfg as DiceMfg;
+    } else {
+        use dice_crate::DiceSerialMfg as DiceMfg;
+    }
+}
 use lpc55_pac::Peripherals;
 use salty::signature::Keypair;
 use sha3::{Digest, Sha3_256};

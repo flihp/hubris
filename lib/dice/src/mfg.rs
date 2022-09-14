@@ -81,6 +81,14 @@ impl DiceMfgRunner for DeviceIdSelfMfg {
     }
 }
 
+pub struct DiceSerialMfg;
+
+impl DiceMfgRunner for DiceSerialMfg {
+    fn run(keypair: &Keypair) -> DiceState {
+        // TODO
+    }
+}
+
 // TODO: get the legit SN from somewhere
 // https://github.com/oxidecomputer/hubris/issues/734
 fn get_serial_number() -> SerialNumber {
