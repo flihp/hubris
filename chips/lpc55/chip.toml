@@ -50,11 +50,11 @@ size = 4096
 # we appropriate this SRAM for passing DICE artifacts
 [dice_alias]
 address = 0x40100000
-size = 0x800
+size = 0x1000
 
 [dice_swdsp]
-address = 0x40100800
-size = 0x800
+address = 0x40101000
+size = 0x1000
 
 [secure_syscon]
 address = 0x50000000

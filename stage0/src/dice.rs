@@ -64,7 +64,7 @@ pub fn run(image: &Image) {
     .sign(&deviceid_keypair);
 
     let alias_data =
-        AliasData::new(alias_okm, alias_cert, dice_state.deviceid_cert.clone());
+        AliasData::new(alias_okm, alias_cert, dice_state.cert.clone());
 
     handoff.store_alias(&alias_data);
 
@@ -80,7 +80,7 @@ pub fn run(image: &Image) {
     .sign(&deviceid_keypair);
 
     let swdsp_data =
-        SwdspData::new(swdsp_okm, swdsp_cert, dice_state.deviceid_cert.clone());
+        SwdspData::new(swdsp_okm, swdsp_cert, dice_state.cert.clone());
 
     handoff.store_swdsp(&swdsp_data);
 }

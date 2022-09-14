@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use crate::{AliasCert, AliasOkm, DeviceIdSelfCert, SwdspCert, SwdspOkm};
+use crate::{AliasCert, AliasOkm, CertBlob, SwdspCert, SwdspOkm};
 use hubpack::SerializedSize;
 use lpc55_pac::syscon::RegisterBlock;
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 // TODO: get from app.toml -> chip.toml at build time
 const MEM_START: usize = 0x4010_0000;
 const ALIAS_START: usize = MEM_START;
-const ALIAS_SIZE: usize = 0x800;
+const ALIAS_SIZE: usize = 0x1000;
 const SWDSP_START: usize = ALIAS_START + ALIAS_SIZE;
 
 // Want to parameterize the unsafe cast from raw pointer & serialization
@@ -81,7 +81,7 @@ pub struct AliasData {
     pub magic: [u8; 16],
     pub seed: AliasOkm,
     pub alias_cert: AliasCert,
-    pub deviceid_cert: DeviceIdSelfCert,
+    pub cert_blob: CertBlob,
 }
 
 impl AliasData {
@@ -93,13 +93,13 @@ impl AliasData {
     pub fn new(
         seed: AliasOkm,
         alias_cert: AliasCert,
-        deviceid_cert: DeviceIdSelfCert,
+        cert_blob: CertBlob,
     ) -> Self {
         Self {
             magic: Self::MAGIC,
             seed,
             alias_cert,
-            deviceid_cert,
+            cert_blob,
         }
     }
     pub fn from_mem() -> Option<Self> {
@@ -142,7 +142,7 @@ pub struct SwdspData {
     pub magic: [u8; 16],
     pub seed: SwdspOkm,
     pub swdsp_cert: SwdspCert,
-    pub deviceid_cert: DeviceIdSelfCert,
+    pub cert_blob: CertBlob,
 }
 
 impl SwdspData {
@@ -154,13 +154,13 @@ impl SwdspData {
     pub fn new(
         seed: SwdspOkm,
         swdsp_cert: SwdspCert,
-        deviceid_cert: DeviceIdSelfCert,
+        cert_blob: CertBlob,
     ) -> Self {
         Self {
             magic: Self::MAGIC,
             seed,
             swdsp_cert,
-            deviceid_cert,
+            cert_blob
         }
     }
     pub fn from_mem() -> Option<Self> {

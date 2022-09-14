@@ -22,7 +22,7 @@ mod alias_cert_tmpl;
 mod deviceid_cert_tmpl;
 mod handoff;
 mod mfg;
-pub use crate::mfg::{DeviceIdSelfMfg, DiceMfgRunner};
+pub use crate::mfg::{CertBlob, DeviceIdSelfMfg, DiceMfgRunner};
 mod swdsp_cert_tmpl;
 pub use crate::handoff::{AliasData, Handoff, SwdspData};
 
