@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use crate::{AliasCert, AliasOkm, CertBlob, SwdspCert, SwdspOkm};
+use crate::{AliasCert, AliasOkm, CertChain, SwdspCert, SwdspOkm};
 use hubpack::SerializedSize;
 use lpc55_pac::syscon::RegisterBlock;
 use serde::{Deserialize, Serialize};
@@ -81,7 +81,7 @@ pub struct AliasData {
     pub magic: [u8; 16],
     pub seed: AliasOkm,
     pub alias_cert: AliasCert,
-    pub cert_blob: CertBlob,
+    pub cert_chain: CertChain,
 }
 
 impl AliasData {
@@ -93,13 +93,13 @@ impl AliasData {
     pub fn new(
         seed: AliasOkm,
         alias_cert: AliasCert,
-        cert_blob: CertBlob,
+        cert_chain: CertChain,
     ) -> Self {
         Self {
             magic: Self::MAGIC,
             seed,
             alias_cert,
-            cert_blob,
+            cert_chain,
         }
     }
     pub fn from_mem() -> Option<Self> {
@@ -142,7 +142,7 @@ pub struct SwdspData {
     pub magic: [u8; 16],
     pub seed: SwdspOkm,
     pub swdsp_cert: SwdspCert,
-    pub cert_blob: CertBlob,
+    pub cert_chain: CertChain,
 }
 
 impl SwdspData {
@@ -154,13 +154,13 @@ impl SwdspData {
     pub fn new(
         seed: SwdspOkm,
         swdsp_cert: SwdspCert,
-        cert_blob: CertBlob,
+        cert_chain: CertChain,
     ) -> Self {
         Self {
             magic: Self::MAGIC,
             seed,
             swdsp_cert,
-            cert_blob
+            cert_chain
         }
     }
     pub fn from_mem() -> Option<Self> {
