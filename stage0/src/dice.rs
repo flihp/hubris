@@ -4,7 +4,7 @@
 
 use crate::image_header::Image;
 use dice_crate::{
-    AliasCertBuilder, AliasData, AliasOkm, Cdi, CdiL1, DeviceIdOkm,
+    AliasCertBuilder, AliasData, AliasOkm, Cdi, CdiL1, CertData, DeviceIdOkm,
     DeviceIdSelfMfg, DiceMfgRunner, Handoff, RngData, RngSeed, SeedBuf,
     SpMeasureCertBuilder, SpMeasureData, SpMeasureOkm,
     TrustQuorumDheCertBuilder, TrustQuorumDheOkm,
@@ -37,6 +37,9 @@ pub fn run(image: &Image) {
 
     // TODO: persistent storage
     let mut dice_state = DeviceIdSelfMfg::run(&deviceid_keypair);
+    let certs = CertData::new(dice_state.cert_chain);
+
+    handoff.store(&certs);
 
     // Collect hash(es) of TCB. The first TCB Component Identifier (TCI)
     // calculated is the Hubris image. The DICE specs call this collection
@@ -75,13 +78,8 @@ pub fn run(image: &Image) {
     )
     .sign(&deviceid_keypair);
 
-    let alias_data = AliasData::new(
-        alias_okm,
-        alias_cert,
-        tqdhe_okm,
-        tqdhe_cert,
-        dice_state.cert_chain.clone(),
-    );
+    let alias_data =
+        AliasData::new(alias_okm, alias_cert, tqdhe_okm, tqdhe_cert);
 
     handoff.store(&alias_data);
 
@@ -96,11 +94,7 @@ pub fn run(image: &Image) {
     )
     .sign(&deviceid_keypair);
 
-    let spmeasure_data = SpMeasureData::new(
-        spmeasure_okm,
-        spmeasure_cert,
-        dice_state.cert_chain.clone(),
-    );
+    let spmeasure_data = SpMeasureData::new(spmeasure_okm, spmeasure_cert);
 
     handoff.store(&spmeasure_data);
 

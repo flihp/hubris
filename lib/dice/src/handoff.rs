@@ -16,10 +16,12 @@ use static_assertions as sa;
 // chips/lpc55/chip.toml
 // TODO: get from app.toml -> chip.toml at build time
 const MEM_START: usize = 0x4010_0000;
-const ALIAS_START: usize = MEM_START;
-const ALIAS_SIZE: usize = 0x1000;
+const CERTS_START: usize = MEM_START;
+const CERTS_SIZE: usize = 0x800;
+const ALIAS_START: usize = CERTS_START + CERTS_SIZE;
+const ALIAS_SIZE: usize = 0x800;
 const SPMEASURE_START: usize = ALIAS_START + ALIAS_SIZE;
-const SPMEASURE_SIZE: usize = 0x1000;
+const SPMEASURE_SIZE: usize = 0x800;
 const RNG_START: usize = SPMEASURE_START + SPMEASURE_SIZE;
 const RNG_SIZE: usize = 0x100;
 
@@ -100,6 +102,35 @@ pub trait HandoffData {
     }
 }
 
+#[derive(Deserialize, Serialize, SerializedSize)]
+pub struct CertData {
+    pub magic: [u8; 16],
+    pub certs: CertChain,
+}
+
+impl HandoffData for CertData {
+    const EXPECTED_MAGIC: [u8; 16] = [
+        0x61, 0x3c, 0xc9, 0x2e, 0x42, 0x97, 0x96, 0xf5, 0xfa, 0xc8, 0x76, 0x69,
+        0x9a, 0xf2, 0x07, 0xbf,
+    ];
+    const MEM_START: usize = CERTS_START;
+    const MEM_SIZE: usize = CERTS_SIZE;
+    const MAX_SIZE: usize = <CertData as SerializedSize>::MAX_SIZE;
+
+    fn get_magic(&self) -> [u8; 16] {
+        self.magic
+    }
+}
+
+impl CertData {
+    pub fn new(certs: CertChain) -> Self {
+        Self {
+            magic: Self::EXPECTED_MAGIC,
+            certs,
+        }
+    }
+}
+
 /// Type to represent DICE derived artifacts used by the root of trust for
 /// reporting in the attestation process. Stage0 will construct an instance of
 /// this type and write it to memory using the Handoff type above. The receiving
@@ -114,7 +145,6 @@ pub struct AliasData {
     pub alias_cert: AliasCert,
     pub tqdhe_seed: TrustQuorumDheOkm,
     pub tqdhe_cert: TrustQuorumDheCert,
-    pub cert_chain: CertChain,
 }
 
 impl HandoffData for AliasData {
@@ -140,7 +170,6 @@ impl AliasData {
         alias_cert: AliasCert,
         tqdhe_seed: TrustQuorumDheOkm,
         tqdhe_cert: TrustQuorumDheCert,
-        cert_chain: CertChain,
     ) -> Self {
         Self {
             magic: Self::EXPECTED_MAGIC,
@@ -148,7 +177,6 @@ impl AliasData {
             alias_cert,
             tqdhe_seed,
             tqdhe_cert,
-            cert_chain,
         }
     }
 }
@@ -160,7 +188,6 @@ pub struct SpMeasureData {
     pub magic: [u8; 16],
     pub seed: SpMeasureOkm,
     pub spmeasure_cert: SpMeasureCert,
-    pub cert_chain: CertChain,
 }
 
 impl HandoffData for SpMeasureData {
@@ -183,16 +210,11 @@ sa::const_assert!(
 );
 
 impl SpMeasureData {
-    pub fn new(
-        seed: SpMeasureOkm,
-        spmeasure_cert: SpMeasureCert,
-        cert_chain: CertChain,
-    ) -> Self {
+    pub fn new(seed: SpMeasureOkm, spmeasure_cert: SpMeasureCert) -> Self {
         Self {
             magic: Self::EXPECTED_MAGIC,
             seed,
             spmeasure_cert,
-            cert_chain,
         }
     }
 }
