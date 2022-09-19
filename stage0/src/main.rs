@@ -17,6 +17,9 @@ use cortex_m_rt::entry;
 
 #[cfg(feature = "dice")]
 mod dice;
+#[cfg(feature = "dice-mfg")]
+mod usart;
+
 // FIXME Need to fixup the secure interface calls
 //mod hypo;
 mod image_header;

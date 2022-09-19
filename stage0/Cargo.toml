@@ -5,6 +5,8 @@ edition = "2018"
 
 [features]
 dice = ["dice_crate", "digest", "salty", "sha3", "unwrap-lite"]
+dice-mfg = ["dice", "lib-lpc55-usart"]
+dice-self = ["dice"]
 tz_support = []
 
 [dependencies]
@@ -23,6 +25,8 @@ zerocopy = "0.6.1"
 abi = { path = "../sys/abi" }
 unwrap-lite = { path = "../lib/unwrap-lite", optional = true }
 nb = "1"
+cfg-if = "1"
+lib-lpc55-usart = { path = "../lib/lpc55-usart", optional = true }
 
 # features & deps can't have the same name, using this method from:
 # https://github.com/RustCrypto/RSA/pull/41/files
@@ -31,15 +35,6 @@ package = "dice"
 path = "../lib/dice"
 default-features = false
 optional = true
-
-#[build-dependencies]
-#hubpack = "0.1"
-#
-#[build-dependencies.dice_crate]
-#package = "dice"
-#path = "../lib/dice"
-#default-features = false
-#optional = true
 
 [dependencies.salty]
 git = "https://github.com/oxidecomputer/salty"

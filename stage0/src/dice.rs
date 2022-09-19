@@ -5,9 +5,9 @@
 use crate::image_header::Image;
 use dice_crate::{
     AliasCertBuilder, AliasData, AliasOkm, Cdi, CdiL1, CertData,
-    CertSerialNumber, DeviceIdOkm, DeviceIdSelfMfg, DiceMfgRunner, Handoff,
-    RngData, RngSeed, SeedBuf, SerialNumber, SpMeasureCertBuilder,
-    SpMeasureData, SpMeasureOkm, TrustQuorumDheCertBuilder, TrustQuorumDheOkm,
+    CertSerialNumber, DeviceIdOkm, Handoff, RngData, RngSeed, SeedBuf,
+    SerialNumber, SpMeasureCertBuilder, SpMeasureData, SpMeasureOkm,
+    TrustQuorumDheCertBuilder, TrustQuorumDheOkm,
 };
 use lpc55_pac::Peripherals;
 use salty::signature::Keypair;
@@ -94,8 +94,9 @@ pub fn run(image: &Image) {
     // type to interact with said memory. We turn this on unconditionally
     // if DICE is enabled so that hubris tasks will always get valid memory
     // even if it's all 0's.
-    let syscon = Peripherals::take().unwrap_lite().SYSCON;
-    let handoff = Handoff::turn_on(&syscon);
+    let peripherals = Peripherals::take().unwrap_lite();
+    let syscon = &peripherals.SYSCON;
+    let handoff = Handoff::turn_on(syscon);
 
     let cdi = match Cdi::from_reg() {
         Some(cdi) => cdi,
@@ -104,8 +105,16 @@ pub fn run(image: &Image) {
 
     let deviceid_keypair = gen_deviceid_keypair(&cdi);
 
-    // TODO: persistent storage
-    let mut dice_state = DeviceIdSelfMfg::run(&deviceid_keypair);
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "dice-mfg")] {
+            let mut dice_state = do_serial_mfg(&deviceid_keypair, &peripherals);
+        } else {
+            use dice_crate::DeviceIdSelfMfg;
+
+            let mut dice_state = DeviceIdSelfMfg::run(&deviceid_keypair);
+        }
+    }
+
     let certs = CertData::new(dice_state.cert_chain);
 
     handoff.store(&certs);
@@ -139,4 +148,36 @@ pub fn run(image: &Image) {
     let rng_data = RngData::new(rng_seed);
 
     handoff.store(&rng_data);
+}
+
+#[cfg(feature = "dice-mfg")]
+fn do_serial_mfg(
+    keypair: &Keypair,
+    peripherals: &Peripherals
+) -> dice_crate::DiceState {
+    use dice_crate::DeviceIdSerialMfg;
+    use lib_lpc55_usart::Usart;
+    use crate::usart;
+    use core::ops::Deref;
+
+    // if dice_state already in flash, extract & return
+
+    usart::setup(
+        &peripherals.SYSCON,
+        &peripherals.IOCON,
+        &peripherals.FLEXCOMM0,
+    );
+
+    let mut usart = Usart::from(peripherals.USART0.deref());
+    let dice_state = DeviceIdSerialMfg::run(&keypair, &mut usart);
+
+    usart::teardown(
+        &peripherals.SYSCON,
+        &peripherals.IOCON,
+        &peripherals.FLEXCOMM0,
+    );
+
+    // write dice_state to flash
+
+    dice_state
 }
