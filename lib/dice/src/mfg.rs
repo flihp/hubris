@@ -10,7 +10,7 @@ use salty::signature::Keypair;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
-const CERT_BLOB_SIZE: usize = 1024;
+const CERT_BLOB_SIZE: usize = 768;
 
 #[derive(Clone, Deserialize, Serialize, SerializedSize)]
 pub struct CertBlob(#[serde(with = "BigArray")] [u8; CERT_BLOB_SIZE]);
