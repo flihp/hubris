@@ -3,6 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::cert::{Cert, DeviceIdSelfCertBuilder};
+use crate::csr::DeviceIdCsrBuilder;
 use crate::{CertSerialNumber, SerialNumber};
 use core::str::FromStr;
 use hubpack::SerializedSize;
@@ -83,13 +84,17 @@ impl DeviceIdSelfMfg {
 pub struct DeviceIdSerialMfg;
 
 impl DeviceIdSerialMfg {
-    pub fn run(_keypair: &Keypair, usart: &mut Usart) -> DiceState {
+    pub fn run(keypair: &Keypair, usart: &mut Usart) -> DiceState {
         let mut buf = [0u8; 128];
         calibrate(usart, &mut buf);
 
-        // check for DiceState in persistent storage
-        // if present return it, else continue mfging
         // wait for CanIHasCsr(SerialNumber)
+
+        let dname_sn =
+            SerialNumber::from_str("0123456789ab").expect("DeviceIdCsr SN");
+        let _deviceid_csr =
+            DeviceIdCsrBuilder::new(&dname_sn, &keypair.public).sign(&keypair);
+
         // send CSR
         // poll HeresYourCert(CertChain)
 
@@ -98,11 +103,9 @@ impl DeviceIdSerialMfg {
             intermediate: CertBlob::default(),
         };
 
-        // write CertChain to flash
-
         DiceState {
             cert_serial_number: CertSerialNumber::default(),
-            serial_number: SerialNumber::from_str("0123456789ab").expect("SN"),
+            serial_number: dname_sn,
             cert_chain,
         }
     }
