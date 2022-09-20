@@ -9,6 +9,7 @@ use crate::{
 use hubpack::SerializedSize;
 use lpc55_pac::syscon::RegisterBlock;
 use serde::{Deserialize, Serialize};
+use static_assertions as sa;
 
 // This memory is the USB peripheral SRAM that's 0x4000 bytes long. Changes
 // to this address must be coordinated with the [dice_*] tables in
@@ -130,6 +131,9 @@ impl HandoffData for AliasData {
     }
 }
 
+// ensure AliasData handoff memory is large enough to store data
+sa::const_assert!(AliasData::MEM_SIZE >= <AliasData as HandoffData>::MAX_SIZE);
+
 impl AliasData {
     pub fn new(
         alias_seed: AliasOkm,
@@ -173,6 +177,11 @@ impl HandoffData for SpMeasureData {
     }
 }
 
+// ensure SpMeasureData handoff memory is large enough store data
+sa::const_assert!(
+    SpMeasureData::MEM_SIZE >= <SpMeasureData as HandoffData>::MAX_SIZE
+);
+
 impl SpMeasureData {
     pub fn new(
         seed: SpMeasureOkm,
@@ -207,6 +216,9 @@ impl HandoffData for RngData {
         self.magic
     }
 }
+
+// ensure RngData handoff memory is large enough store data
+sa::const_assert!(RngData::MEM_SIZE >= <RngData as HandoffData>::MAX_SIZE);
 
 impl RngData {
     pub fn new(seed: RngSeed) -> Self {
