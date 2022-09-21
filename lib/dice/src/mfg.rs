@@ -6,6 +6,7 @@ use crate::cert::{Cert, DeviceIdSelfCertBuilder};
 use crate::csr::DeviceIdCsrBuilder;
 use crate::{CertSerialNumber, SerialNumber};
 use core::str::FromStr;
+use dice_mfg_msgs::{Msg, Msgs};
 use hubpack::SerializedSize;
 use lib_lpc55_usart::{Error, Read, Usart, Write};
 use salty::signature::Keypair;
@@ -81,22 +82,28 @@ impl DeviceIdSelfMfg {
     }
 }
 
-pub struct DeviceIdSerialMfg;
+pub struct DeviceIdSerialMfg<'a> {
+    keypair: &'a Keypair,
+    usart: &'a mut Usart<'a>,
+    // state?
+}
 
-impl DeviceIdSerialMfg {
-    pub fn run(keypair: &Keypair, usart: &mut Usart) -> DiceState {
-        let mut buf = [0u8; 128];
-        calibrate(usart, &mut buf);
+impl<'a> DeviceIdSerialMfg<'a> {
+    pub fn new(keypair: &'a Keypair, usart: &'a mut Usart<'a>) -> Self {
+        DeviceIdSerialMfg { keypair, usart }
+    }
 
-        // wait for CanIHasCsr(SerialNumber)
+    pub fn run(mut self) -> DiceState {
+        let mut buf = [0u8; Msg::MAX_ENCODED_SIZE];
+
+        self.serial_warmup(&mut buf);
 
         let dname_sn =
             SerialNumber::from_str("0123456789ab").expect("DeviceIdCsr SN");
         let _deviceid_csr =
-            DeviceIdCsrBuilder::new(&dname_sn, &keypair.public).sign(&keypair);
+            DeviceIdCsrBuilder::new(&dname_sn, &self.keypair.public).sign(&self.keypair);
 
-        // send CSR
-        // poll HeresYourCert(CertChain)
+        // wait for request for CSR
 
         let cert_chain = CertChain {
             device_id: CertBlob::default(),
@@ -107,6 +114,52 @@ impl DeviceIdSerialMfg {
             cert_serial_number: CertSerialNumber::default(),
             serial_number: dname_sn,
             cert_chain,
+        }
+    }
+
+    fn serial_warmup(&mut self, buf: &mut [u8; Msg::MAX_ENCODED_SIZE]) {
+        loop {
+            match read_until(self.usart, buf, &[0]) {
+                Ok(size) => {
+                    let msg = match Msg::decode(&buf[..size]) {
+                        Ok(msg) => msg,
+                        Err(_) => {
+                            buf.fill(0);
+                            let msg = Msg {
+                                id: 0,
+                                msg: Msgs::NotGreat,
+                            };
+                            let size = msg.encode(buf).expect("encode");
+                            let _ = write_all(self.usart, &buf[..size]);
+                            continue;
+                        }
+                    };
+                    match msg.msg {
+                        Msgs::HowYouDoin(_) => {
+                            buf.fill(0);
+                            let msg = Msg {
+                                id: 0,
+                                msg: Msgs::NotBad,
+                            };
+                            let size = msg.encode(buf).expect("encode");
+                            let _ = write_all(self.usart, &buf[..size]);
+                            continue;
+                        },
+                        Msgs::Break => break,
+                        _ => continue,
+                    }
+                },
+                Err(_) => {
+                    buf.fill(0);
+                    let msg = Msg {
+                        id: 0,
+                        msg: Msgs::NotGreat,
+                    };
+                    let size = msg.encode(buf).expect("encode");
+                    let _ = write_all(self.usart, &buf[..size]);
+                    continue;
+                },
+            };
         }
     }
 }
@@ -169,46 +222,4 @@ pub fn read_until(
         }
     }
     Ok(pos)
-}
-
-/// Like 'flush' from embedded-hal 'Write' trait but polls till the transmit
-/// FIFO is empty.
-pub fn flush_all(usart: &mut Usart) {
-    let mut done = false;
-    while !done {
-        done = match usart.flush() {
-            Ok(_) => true,
-            Err(nb::Error::WouldBlock) => false,
-            Err(nb::Error::Other(_)) => false,
-        }
-    }
-}
-
-fn echo_till_str(usart: &mut Usart, term: &str, buf: &mut [u8]) -> bool {
-    if term.len() > buf.len() {
-        return false;
-    }
-
-    loop {
-        match read_until(usart, buf, &[b'\r']) {
-            Ok(size) => {
-                if &buf[..size - 1] == term.as_bytes() {
-                    return true;
-                }
-                match write_all(usart, &buf[..size]) {
-                    Ok(_) => buf.fill(0),
-                    Err(_) => (),
-                }
-            }
-            Err(_) => match write_all(usart, "read error\n".as_bytes()) {
-                Ok(_) => buf.fill(0),
-                Err(_) => (),
-            },
-        }
-    }
-}
-
-pub fn calibrate(usart: &mut Usart, buf: &mut [u8]) {
-    let _ = write_all(usart, "echo_till_str: \"deviceid\"\n>".as_bytes());
-    echo_till_str(usart, "deviceid", buf);
 }

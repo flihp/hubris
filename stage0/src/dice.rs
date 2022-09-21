@@ -168,10 +168,9 @@ fn do_serial_mfg(
         &peripherals.FLEXCOMM0,
     );
 
-    // start here for message exchange
-
     let mut usart = Usart::from(peripherals.USART0.deref());
-    let dice_state = DeviceIdSerialMfg::run(&keypair, &mut usart);
+    let mfg = DeviceIdSerialMfg::new(&keypair, &mut usart);
+    let dice_state = mfg.run();
 
     usart::teardown(
         &peripherals.SYSCON,
