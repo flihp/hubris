@@ -2,6 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+// hubpack won't serialized a Vec
+use dice_mfg_msgs::SizedBlob;
+
 use crate::{deviceid_csr_tmpl, SerialNumber};
 use core::ops::Range;
 use hubpack::SerializedSize;
@@ -68,7 +71,7 @@ impl DeviceIdCsrBuilder {
 
     const SIGNDATA_RANGE: Range<usize> = deviceid_csr_tmpl::SIGNDATA_RANGE;
 
-    pub fn sign(self, keypair: &Keypair) -> DeviceIdCsr
+    pub fn sign(self, keypair: &Keypair) -> SizedBlob
     where
         Self: Sized,
     {
@@ -76,7 +79,9 @@ impl DeviceIdCsrBuilder {
         let sig = keypair.sign(signdata);
         let tmp = self.set_sig(&sig.to_bytes());
 
-        DeviceIdCsr(tmp.0)
+        // this will only fail if deviceid_csr_tmpl::SIZE > BLOB_SIZE
+        // static assert?
+        SizedBlob::try_from(&tmp.0[..]).expect("csr sign")
     }
 }
 
@@ -89,8 +94,3 @@ impl CsrBuilder for DeviceIdCsrBuilder {
         &mut self.0
     }
 }
-
-#[derive(Deserialize, Serialize, SerializedSize)]
-pub struct DeviceIdCsr(
-    #[serde(with = "BigArray")] [u8; deviceid_csr_tmpl::SIZE],
-);
