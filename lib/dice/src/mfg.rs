@@ -8,41 +8,14 @@ use crate::{CertSerialNumber, SerialNumber};
 use core::str::FromStr;
 use dice_mfg_msgs::{Msg, Msgs, SizedBlob};
 use hubpack::SerializedSize;
-use lib_lpc55_usart::{Error, Read, Usart, Write};
+use lib_lpc55_usart::{Read, Usart, Write};
 use salty::signature::Keypair;
 use serde::{Deserialize, Serialize};
-use serde_big_array::BigArray;
-
-const CERT_BLOB_SIZE: usize = 768;
-
-#[derive(Clone, Deserialize, Serialize, SerializedSize)]
-pub struct CertBlob(#[serde(with = "BigArray")] [u8; CERT_BLOB_SIZE]);
-
-impl Default for CertBlob {
-    fn default() -> Self {
-        Self([0u8; CERT_BLOB_SIZE])
-    }
-}
-
-// we'd get this for free if 'Certs' implemented Copy
-// but last time I did that I copied unknowningly and bloated things horribly
-// this interface is an explicit copy
-// alternatively the DeviceId cert could be a CertBlob from the "get go"?
-impl<T: Cert> From<T> for CertBlob {
-    fn from(t: T) -> Self {
-        let mut buf = [0u8; CERT_BLOB_SIZE];
-
-        let bytes = t.as_bytes();
-        buf[..bytes.len()].copy_from_slice(bytes);
-
-        Self(buf)
-    }
-}
 
 #[derive(Clone, Deserialize, Serialize, SerializedSize)]
 pub struct CertChain {
-    pub device_id: CertBlob,
-    pub intermediate: CertBlob,
+    pub device_id: SizedBlob,
+    pub intermediate: SizedBlob,
 }
 
 // data returned to caller by MFG
@@ -54,13 +27,18 @@ pub struct DiceState {
     pub cert_chain: CertChain,
 }
 
+pub enum Error {
+    MsgDecode,
+    MsgBufFull,
+    UsartRead,
+    UsartWrite,
+}
+
 pub struct DeviceIdSelfMfg;
 
 impl DeviceIdSelfMfg {
     pub fn run(keypair: &Keypair) -> DiceState {
         let mut cert_sn: CertSerialNumber = Default::default();
-        // TODO: non-self-signed certs will need real SNs
-        // https://github.com/oxidecomputer/hubris/issues/734
         let dname_sn =
             SerialNumber::from_str("0123456789ab").expect("DeviceIdSelf SN");
 
@@ -75,8 +53,10 @@ impl DeviceIdSelfMfg {
             cert_serial_number: cert_sn,
             serial_number: dname_sn,
             cert_chain: CertChain {
-                device_id: CertBlob::from(deviceid_cert),
-                intermediate: CertBlob::default(),
+                // TODO: static assert deviceid_cert size < SizedBuf max
+                device_id: SizedBlob::try_from(deviceid_cert.as_bytes())
+                    .expect("deviceid cert to SizedBlob"),
+                intermediate: SizedBlob::default(),
             },
         }
     }
@@ -85,188 +65,149 @@ impl DeviceIdSelfMfg {
 pub struct DeviceIdSerialMfg<'a> {
     keypair: &'a Keypair,
     usart: &'a mut Usart<'a>,
-    // state?
+    buf: [u8; Msg::MAX_ENCODED_SIZE],
+    serial_number: Option<SerialNumber>,
+    deviceid_cert: Option<SizedBlob>,
+    intermediate_cert: Option<SizedBlob>,
 }
 
 impl<'a> DeviceIdSerialMfg<'a> {
+    // use associated type for the message type?
+
     pub fn new(keypair: &'a Keypair, usart: &'a mut Usart<'a>) -> Self {
-        DeviceIdSerialMfg { keypair, usart }
+        DeviceIdSerialMfg {
+            keypair,
+            usart,
+            buf: [0u8; Msg::MAX_ENCODED_SIZE],
+            serial_number: None,
+            deviceid_cert: None,
+            intermediate_cert: None,
+        }
     }
 
     pub fn run(mut self) -> DiceState {
-        let mut buf = [0u8; Msg::MAX_ENCODED_SIZE];
+        loop {
+            let msg = match self.get_msg() {
+                Ok(msg) => msg,
+                Err(_) => continue,
+            };
 
-        self.serial_warmup(&mut buf);
+            let _ = match msg.msg {
+                Msgs::Break => {
+                    if self.serial_number.is_none()
+                        || self.deviceid_cert.is_none()
+                        || self.intermediate_cert.is_none()
+                    {
+                        let _ = self.send_nak();
+                        continue;
+                    } else {
+                        let _ = self.send_ack();
+                        break;
+                    }
+                }
+                Msgs::BreakForce => {
+                    let _ = self.send_ack();
+                    break;
+                },
+                Msgs::CsrPlz => self.handle_csrplz(),
+                Msgs::DeviceIdCert(cert) => self.handle_deviceid_cert(cert),
+                Msgs::IntermediateCert(cert) => {
+                    self.handle_intermediate_cert(cert)
+                }
+                Msgs::Ping => self.send_ack(),
+                Msgs::SerialNumber(sn) => {
+                    self.handle_serial_number(SerialNumber::from_bytes(&sn))
+                }
+                _ => continue,
+            };
+        }
 
-        let dname_sn = self.get_dname_sn(&mut buf);
-
-        let csr_blob =
-            DeviceIdCsrBuilder::new(&dname_sn, &self.keypair.public)
-                .sign(&self.keypair);
-
-        let cert_chain = self.certify_csr(csr_blob, &mut buf);
+        let _ = flush_all(self.usart);
 
         DiceState {
             cert_serial_number: CertSerialNumber::default(),
-            serial_number: dname_sn,
-            cert_chain,
+            serial_number: self.serial_number.unwrap(),
+            cert_chain: CertChain {
+                device_id: self.deviceid_cert.unwrap(),
+                intermediate: self.intermediate_cert.unwrap(),
+            },
         }
     }
 
-    fn certify_csr(
+    fn handle_serial_number(
         &mut self,
-        csr: SizedBlob,
-        buf: &mut [u8; Msg::MAX_ENCODED_SIZE],
-    ) -> CertChain {
-        loop {
-            buf.fill(0);
-            // send Ack (retry?)
-            let msg = Msg {
-                id: 0,
-                msg: Msgs::SerialNumberAck,
-            };
-            let size = msg.encode(buf).expect("encode SerialNumberAck");
-            let _ = write_all(self.usart, &buf[..size]);
+        serial_number: SerialNumber
+    ) -> Result<(), Error> {
+        self.serial_number = Some(serial_number);
 
-            let msg = match read_until(self.usart, buf, &[0]) {
-                Ok(size) => {
-                    match Msg::decode(&buf[..size]) {
-                        Ok(msg) => msg,
-                        Err(_) => continue,
-                    }
-                },
-                Err(_) => continue,
-            };
+        self.send_ack()
+    }
 
-            match msg.msg {
-                Msgs::PlzSendCsr => break,
-                _ => continue,
-            };
+    fn handle_csrplz(&mut self) -> Result<(), Error> {
+        if self.serial_number.is_none() {
+            return self.send_nak();
         }
 
-        // send CSR
-        loop {
-            buf.fill(0);
-            let msg = Msg {
-                id: 0,
-                msg: Msgs::Csr(csr.clone()),
-            };
-            let size = msg.encode(buf).expect("certify_csr");
-            // above clone might be avoided if we can resend just
-            // the buffer?
-            let _ = write_all(self.usart, &buf[..size]);
+        let csr = DeviceIdCsrBuilder::new(
+            &self.serial_number.unwrap(),
+            &self.keypair.public,
+        )
+        .sign(&self.keypair);
 
-            // waiting for Msgs::CsrAck
-            let msg = match read_until(self.usart, buf, &[0]) {
-                Ok(size) => {
-                    match Msg::decode(&buf[..size]) {
-                        Ok(msg) => msg,
-                        Err(_) => continue,
-                    }
-                },
-                Err(_) => continue,
-            };
+        self.send_csr(csr)
+    }
 
-            match msg.msg {
-                Msgs::CsrAck => break,
-                _ => continue,
-            }
-        }
-        // currently the end of the protocol exchange
-        // but next step is getting cert chain
-        CertChain {
-            device_id: CertBlob::default(),
-            intermediate: CertBlob::default(),
+    fn send_csr(&mut self, csr: SizedBlob) -> Result<(), Error> {
+        self.send_msg(Msg {
+            id: 0,
+            msg: Msgs::Csr(csr.clone()),
+        })
+    }
+
+    fn handle_deviceid_cert(&mut self, cert: SizedBlob) -> Result<(), Error> {
+        self.deviceid_cert = Some(cert);
+
+        self.send_ack()
+    }
+
+    fn handle_intermediate_cert(&mut self, cert: SizedBlob) -> Result<(), Error> {
+        self.intermediate_cert = Some(cert);
+
+        self.send_ack()
+    }
+
+    fn send_ack(&mut self) -> Result<(), Error> {
+        let msg = Msg {
+            id: 0,
+            msg: Msgs::Ack,
+        };
+
+        self.send_msg(msg)
+    }
+
+    fn send_nak(&mut self) -> Result<(), Error> {
+        let msg = Msg {
+            id: 0,
+            msg: Msgs::Nak,
+        };
+
+        self.send_msg(msg)
+    }
+
+    fn get_msg(&mut self) -> Result<Msg, Error> {
+        let buf = &mut self.buf;
+
+        match read_until(self.usart, buf, &[0]) {
+            Ok(size) => Msg::decode(&buf[..size]).map_err(|_| Error::MsgDecode),
+            Err(_) => Err(Error::UsartRead),
         }
     }
 
-    fn get_dname_sn(
-        &mut self,
-        buf: &mut [u8; Msg::MAX_ENCODED_SIZE],
-    ) -> SerialNumber {
-        loop {
-            let msg = match read_until(self.usart, buf, &[0]) {
-                Ok(size) => {
-                    match Msg::decode(&buf[..size]) {
-                        Ok(msg) => msg,
-                        Err(_) => {
-                            // retry
-                            buf.fill(0);
-                            let msg = Msg {
-                                id: 0,
-                                msg: Msgs::NotGreat, // should be 'Retry'?
-                            };
-                            let size = msg.encode(buf).expect("encode");
-                            let _ = write_all(self.usart, &buf[..size]);
-                            continue;
-                        }
-                    }
-                }
-                Err(_) => {
-                    // retry
-                    buf.fill(0);
-                    let msg = Msg {
-                        id: 0,
-                        msg: Msgs::NotGreat, // should be 'Retry'?
-                    };
-                    let size = msg.encode(buf).expect("encode");
-                    let _ = write_all(self.usart, &buf[..size]);
-                    continue;
-                }
-            };
-            return match msg.msg {
-                Msgs::SerialNumber(serial_number) => {
-                    SerialNumber::from_bytes(&serial_number)
-                }
-                _ => continue,
-            };
-        }
-    }
+    fn send_msg(&mut self, msg: Msg) -> Result<(), Error> {
+        self.buf.fill(0);
 
-    fn serial_warmup(&mut self, buf: &mut [u8; Msg::MAX_ENCODED_SIZE]) {
-        loop {
-            match read_until(self.usart, buf, &[0]) {
-                Ok(size) => {
-                    let msg = match Msg::decode(&buf[..size]) {
-                        Ok(msg) => msg,
-                        Err(_) => {
-                            buf.fill(0);
-                            let msg = Msg {
-                                id: 0,
-                                msg: Msgs::NotGreat,
-                            };
-                            let size = msg.encode(buf).expect("encode");
-                            let _ = write_all(self.usart, &buf[..size]);
-                            continue;
-                        }
-                    };
-                    match msg.msg {
-                        Msgs::HowYouDoin(_) => {
-                            buf.fill(0);
-                            let msg = Msg {
-                                id: 0,
-                                msg: Msgs::NotBad,
-                            };
-                            let size = msg.encode(buf).expect("encode");
-                            let _ = write_all(self.usart, &buf[..size]);
-                            continue;
-                        }
-                        Msgs::Break => break,
-                        _ => continue,
-                    }
-                }
-                Err(_) => {
-                    buf.fill(0);
-                    let msg = Msg {
-                        id: 0,
-                        msg: Msgs::NotGreat,
-                    };
-                    let size = msg.encode(buf).expect("encode");
-                    let _ = write_all(self.usart, &buf[..size]);
-                    continue;
-                }
-            };
-        }
+        let size = msg.encode(&mut self.buf).expect("encode msg");
+        write_all(self.usart, &self.buf[..size])
     }
 }
 
@@ -279,10 +220,24 @@ fn write_all(usart: &mut Usart, src: &[u8]) -> Result<(), Error> {
             done = match usart.write(*b) {
                 Ok(_) => true,
                 Err(nb::Error::WouldBlock) => false,
-                Err(nb::Error::Other(e)) => return Err(e),
+                Err(nb::Error::Other(_)) => return Err(Error::UsartWrite),
             }
         }
     }
+    Ok(())
+}
+
+fn flush_all(usart: &mut Usart) -> Result<(), Error> {
+    let mut done = false;
+
+    while !done {
+        done = match usart.flush() {
+            Ok(_) => true,
+            Err(nb::Error::WouldBlock) => false,
+            Err(nb::Error::Other(_)) => return Err(Error::UsartWrite),
+        }
+    }
+
     Ok(())
 }
 
@@ -302,7 +257,7 @@ pub fn read_until(
         done = match usart.read() {
             Ok(b) => {
                 if pos > dst.len() - 1 {
-                    return Err(Error::BufFull);
+                    return Err(Error::MsgBufFull);
                 }
                 dst[pos] = b;
                 pos += 1;
@@ -324,7 +279,7 @@ pub fn read_until(
                 }
             }
             Err(nb::Error::WouldBlock) => false,
-            Err(nb::Error::Other(e)) => return Err(e),
+            Err(nb::Error::Other(_)) => return Err(Error::UsartWrite),
         }
     }
     Ok(pos)

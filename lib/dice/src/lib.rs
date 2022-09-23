@@ -27,7 +27,7 @@ mod deviceid_csr_tmpl;
 mod handoff;
 mod mfg;
 pub use crate::mfg::{
-    CertBlob, CertChain, DeviceIdSelfMfg, DeviceIdSerialMfg, DiceState,
+    CertChain, DeviceIdSelfMfg, DeviceIdSerialMfg, DiceState,
 };
 mod spmeasure_cert_tmpl;
 mod trust_quorum_dhe_cert_tmpl;
