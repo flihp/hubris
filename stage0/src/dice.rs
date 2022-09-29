@@ -6,14 +6,19 @@ use crate::image_header::Image;
 use core::convert::TryInto;
 use dice_crate::{
     AliasCertBuilder, AliasData, AliasOkm, Cdi, CdiL1, CertData,
-    CertSerialNumber, DeviceIdOkm, DeviceIdSelfMfg, DiceMfg, Handoff, RngData,
-    RngSeed, SeedBuf, SerialNumber, SpMeasureCertBuilder, SpMeasureData,
-    SpMeasureOkm, TrustQuorumDheCertBuilder, TrustQuorumDheOkm,
+    CertSerialNumber, DeviceIdOkm, DiceMfg, Handoff, RngData, RngSeed, SeedBuf,
+    SerialNumber, SpMeasureCertBuilder, SpMeasureData, SpMeasureOkm,
+    TrustQuorumDheCertBuilder, TrustQuorumDheOkm,
 };
 use lpc55_pac::Peripherals;
 use salty::signature::Keypair;
 use sha3::{Digest, Sha3_256};
 use unwrap_lite::UnwrapLite;
+
+#[cfg(feature = "dice-self")]
+use dice_crate::DeviceIdSelfMfg;
+#[cfg(feature = "dice-mfg")]
+use dice_crate::DeviceIdSerialMfg;
 
 fn gen_deviceid_keypair(cdi: &Cdi) -> Keypair {
     let devid_okm = DeviceIdOkm::from_cdi(cdi);
@@ -26,11 +31,38 @@ struct SerialNumbers {
     serial_number: SerialNumber,
 }
 
-fn gen_mfg_artifacts(
-    deviceid_keypair: &Keypair,
-    handoff: &Handoff,
-) -> SerialNumbers {
-    let mfg = DeviceIdSelfMfg::new(deviceid_keypair);
+#[cfg(feature = "dice-mfg")]
+fn setup_serial_mfg<'a>(
+    keypair: &'a Keypair,
+    peripherals: &'a Peripherals,
+) -> DeviceIdSerialMfg<'a> {
+    use crate::usart;
+    use core::ops::Deref;
+    use lib_lpc55_usart::Usart;
+
+    // if dice_state already in flash, extract & return
+    usart::setup(
+        &peripherals.SYSCON,
+        &peripherals.IOCON,
+        &peripherals.FLEXCOMM0,
+    );
+
+    let usart = Usart::from(peripherals.USART0.deref());
+    DeviceIdSerialMfg::new(&keypair, usart)
+}
+
+#[cfg(feature = "dice-mfg")]
+fn teardown_serial_mfg(peripherals: &Peripherals) {
+    use crate::usart;
+
+    usart::teardown(
+        &peripherals.SYSCON,
+        &peripherals.IOCON,
+        &peripherals.FLEXCOMM0,
+    );
+}
+
+fn gen_mfg_artifacts<T: DiceMfg>(mfg: T, handoff: &Handoff) -> SerialNumbers {
     let mfg_state = mfg.run();
 
     // transfer certs to CertData for serialization
@@ -132,8 +164,8 @@ pub fn run(image: &Image) {
     // type to interact with said memory. We turn this on unconditionally
     // if DICE is enabled so that hubris tasks will always get valid memory
     // even if it's all 0's.
-    let syscon = Peripherals::take().unwrap_lite().SYSCON;
-    let handoff = Handoff::turn_on(&syscon);
+    let peripherals = Peripherals::take().unwrap_lite();
+    let handoff = Handoff::turn_on(&peripherals.SYSCON);
 
     let cdi = match Cdi::from_reg() {
         Some(cdi) => cdi,
@@ -142,7 +174,16 @@ pub fn run(image: &Image) {
 
     let deviceid_keypair = gen_deviceid_keypair(&cdi);
 
-    let mut serial_numbers = gen_mfg_artifacts(&deviceid_keypair, &handoff);
+    #[cfg(feature = "dice-mfg")]
+    let mfg = setup_serial_mfg(&deviceid_keypair, &peripherals);
+
+    #[cfg(feature = "dice-self")]
+    let mfg = DeviceIdSelfMfg::new(&deviceid_keypair);
+
+    let mut serial_numbers = gen_mfg_artifacts(mfg, &handoff);
+
+    #[cfg(feature = "dice-mfg")]
+    teardown_serial_mfg(&peripherals);
 
     let fwid = gen_fwid(image);
 

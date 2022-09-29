@@ -8,6 +8,7 @@ use crate::{
 };
 use core::str::FromStr;
 use dice_mfg_msgs::SizedBlob;
+use lib_lpc55_usart::Usart;
 use salty::signature::Keypair;
 
 // data returned to caller by MFG
@@ -51,6 +52,46 @@ impl DiceMfg for DeviceIdSelfMfg<'_> {
             cert_serial_number: cert_sn,
             serial_number: dname_sn,
             // TODO: static assert deviceid_cert size < SizedBuf max
+            deviceid_cert: SizedBlob::try_from(deviceid_cert.as_bytes())
+                .expect("deviceid cert to SizedBlob"),
+            intermediate_cert: SizedBlob::default(),
+        }
+    }
+}
+
+pub struct DeviceIdSerialMfg<'a> {
+    keypair: &'a Keypair,
+    usart: Usart<'a>,
+}
+
+impl<'a> DeviceIdSerialMfg<'a> {
+    pub fn new(keypair: &'a Keypair, usart: Usart<'a>) -> Self {
+        Self { keypair, usart }
+    }
+}
+
+impl DiceMfg for DeviceIdSerialMfg<'_> {
+    fn run(self) -> DiceMfgState {
+        // check for DiceState in persistent storage
+        // if present return it, else continue mfging
+        // wait for CanIHasCsr(SerialNumber)
+        // send CSR
+        // poll HeresYourCert(CertChain)
+
+        let mut cert_sn: CertSerialNumber = Default::default();
+        let dname_sn =
+            SerialNumber::from_str("0123456789ab").expect("DeviceIdSelf SN");
+
+        let deviceid_cert = DeviceIdSelfCertBuilder::new(
+            &cert_sn.next(),
+            &dname_sn,
+            &self.keypair.public,
+        )
+        .sign(self.keypair);
+
+        DiceMfgState {
+            cert_serial_number: cert_sn,
+            serial_number: dname_sn,
             deviceid_cert: SizedBlob::try_from(deviceid_cert.as_bytes())
                 .expect("deviceid cert to SizedBlob"),
             intermediate_cert: SizedBlob::default(),
