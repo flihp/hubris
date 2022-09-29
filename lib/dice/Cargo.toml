@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# this must be pushed before PR
+dice-mfg-msgs = { path = "../../../dice-util/dice-mfg-msgs" }
 hkdf = { version = "0.12", default-features = false }
 hubpack = "0.1"
 lpc55-pac = "0.4"
