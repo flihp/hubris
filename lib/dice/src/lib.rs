@@ -19,8 +19,11 @@ pub use crate::cert::{
     DeviceIdSelfCertBuilder, SpMeasureCert, SpMeasureCertBuilder,
     TrustQuorumDheCert, TrustQuorumDheCertBuilder,
 };
+mod csr;
+pub use crate::csr::DeviceIdCsrBuilder;
 mod alias_cert_tmpl;
 mod deviceid_cert_tmpl;
+mod deviceid_csr_tmpl;
 mod handoff;
 mod mfg;
 pub use crate::mfg::{

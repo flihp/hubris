@@ -701,6 +701,7 @@ dependencies = [
  "hubpack 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lib-lpc55-usart",
  "lpc55-pac",
+ "nb 1.0.0",
  "salty",
  "serde",
  "serde-big-array",
