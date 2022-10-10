@@ -3297,6 +3297,7 @@ dependencies = [
  "digest 0.10.3",
  "ecdsa",
  "hmac 0.10.1",
+ "hubpack 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lib-lpc55-usart",
  "lpc55-pac",
  "lpc55_romapi",
@@ -3305,7 +3306,10 @@ dependencies = [
  "panic-halt",
  "panic-semihosting",
  "salty",
+ "serde",
+ "serde-big-array",
  "sha3",
+ "static_assertions",
  "unwrap-lite",
  "zerocopy",
 ]

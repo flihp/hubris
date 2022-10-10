@@ -4,14 +4,18 @@ version = "0.1.0"
 edition = "2018"
 
 [features]
-dice-mfg = ["dice_crate", "digest", "salty", "sha3", "unwrap-lite", "lib-lpc55-usart"]
-dice-self = ["dice_crate", "digest", "salty", "sha3", "unwrap-lite"]
+# benefit to keeping dependencies separate?
+dice = ["dice_crate", "digest", "hubpack", "salty", "serde", "serde-big-array",
+        "sha3", "static_assertions", "unwrap-lite", "lib-lpc55-usart"]
+dice-mfg = ["dice"]
+dice-self = ["dice"]
 tz_support = []
 
 [dependencies]
 cortex-m = {version = "0.7", features = ["inline-asm"]}
 cortex-m-rt = "0.6.12"
 digest = { version = "0.10", optional = true }
+hubpack = { version = "0.1", optional = true }
 panic-semihosting = "0.5.3"
 lpc55_romapi = { path = "../drv/lpc55-romapi" }
 panic-halt = "0.2.0"
@@ -20,6 +24,9 @@ ecdsa = { version = "0.12.4", default-features = false, features = ["der"] }
 p256 = { version = "0.9.0", default-features = false, features = ["ecdsa", "ecdsa-core"] }
 hmac = { version = "0.10.1", default-features = false }
 sha3 = { version = "0.10", default-features = false, optional = true }
+serde = { version = "1", default-features = false, features = ["derive"], optional = true }
+serde-big-array = { version = "0.4", optional = true }
+static_assertions = { version = "1", optional = true }
 zerocopy = "0.6.1"
 abi = { path = "../sys/abi" }
 unwrap-lite = { path = "../lib/unwrap-lite", optional = true }
