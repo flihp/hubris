@@ -3291,6 +3291,7 @@ name = "stage0"
 version = "0.1.0"
 dependencies = [
  "abi",
+ "cfg-if",
  "cortex-m",
  "cortex-m-rt",
  "dice",
