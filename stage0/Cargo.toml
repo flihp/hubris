@@ -34,6 +34,9 @@ optional = true
 
 [build-dependencies]
 build-util = { path = "../build/util" }
+serde = "1"
+ron = "0.7"
+abi = {path = "../sys/abi"}
 
 #[build-dependencies]
 #hubpack = "0.1"

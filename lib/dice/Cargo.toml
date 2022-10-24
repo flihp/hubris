@@ -15,6 +15,9 @@ unwrap-lite = { path = "../unwrap-lite" }
 zeroize = { version = "1.5.7", default-features = false, features = ["zeroize_derive"] }
 zerocopy = "0.6"
 
+[build-dependencies]
+build-util = {path = "../../build/util"}
+
 [dependencies.salty]
 git = "https://github.com/oxidecomputer/salty"
 rev = "eb3c31858f631a7fb9934246c8efdef080d05726"

@@ -36,6 +36,7 @@ pub const DEFAULT_KERNEL_STACK: u32 = 1024;
 ///
 /// It should be trivial to calculate and kept constant during the build;
 /// mutable build information should be accumulated elsewhere.
+#[derive(Debug)]
 struct PackageConfig {
     /// Path to the `app.toml` file being built
     app_toml_file: PathBuf,
@@ -1689,6 +1690,7 @@ pub struct KernelConfig {
     tasks: Vec<abi::TaskDesc>,
     regions: Vec<abi::RegionDesc>,
     irqs: Vec<abi::Interrupt>,
+    dice_data: Vec<(String, abi::RegionDesc)>,
 }
 
 /// Generate the application descriptor table that the kernel uses to find and
@@ -1711,6 +1713,7 @@ pub fn make_kconfig(
     let mut regions = vec![];
     let mut task_descs = vec![];
     let mut irqs = vec![];
+    let mut dice_data: Vec<(String, abi::RegionDesc)> = vec![];
 
     // Region 0 is the NULL region, used as a placeholder. It gives no access to
     // memory.
@@ -1725,6 +1728,37 @@ pub fn make_kconfig(
     // efficiently by name later.
     let mut peripheral_index = IndexMap::new();
     let sname = &"secure".to_string();
+
+    // if kernel config from app.toml has dice_data
+    if toml.kernel.dice_data.is_some() {
+        // iterate over each DiceData from dice_data
+        for (name, dice_entry) in toml.kernel.dice_data.as_ref().unwrap().iter()
+        {
+            // find peripheral with name from dice_entry
+            let periph = match toml.peripherals.get(&dice_entry.peripheral) {
+                Some(periph) => periph,
+                None => {
+                    panic!(
+                        "dice-data entry has bad peripheral name: '{}'",
+                        dice_entry.peripheral
+                    );
+                }
+            };
+
+            dice_data.push((
+                name.clone(),
+                abi::RegionDesc {
+                    base: periph.address,
+                    size: periph.size,
+                    attributes: abi::RegionAttributes::DEVICE
+                        | abi::RegionAttributes::READ
+                        | abi::RegionAttributes::WRITE,
+                },
+            ));
+        }
+    }
+
+    println!("dice_data: {:?}", dice_data);
 
     // Build a set of all peripheral names used by tasks, which we'll use
     // to filter out unused peripherals.
@@ -1969,6 +2003,7 @@ pub fn make_kconfig(
         irqs,
         tasks: task_descs,
         regions,
+        dice_data,
     })
 }
 

@@ -695,6 +695,7 @@ dependencies = [
 name = "dice"
 version = "0.1.0"
 dependencies = [
+ "build-util",
  "chrono",
  "hkdf",
  "hubpack 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3295,7 +3296,9 @@ dependencies = [
  "p256",
  "panic-halt",
  "panic-semihosting",
+ "ron 0.7.0",
  "salty",
+ "serde",
  "sha3",
  "unwrap-lite",
  "zerocopy",

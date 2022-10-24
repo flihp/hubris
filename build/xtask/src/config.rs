@@ -494,12 +494,21 @@ pub struct Signing {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct DiceData {
+    pub peripheral: String,
+    pub offset: u32,
+    pub size: u32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Kernel {
     pub name: String,
     pub requires: IndexMap<String, u32>,
     pub stacksize: Option<u32>,
     #[serde(default)]
     pub features: Vec<String>,
+    pub dice_data: Option<IndexMap<String, DiceData>>,
 }
 
 fn default_name() -> String {
@@ -608,6 +617,7 @@ where
 }
 
 /// Stores arguments and environment variables to run on a particular task.
+#[derive(Debug)]
 pub struct BuildConfig<'a> {
     pub crate_name: String,
 
