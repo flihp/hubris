@@ -40,7 +40,12 @@ default-features = false
 optional = true
 
 [build-dependencies]
+build-kconfig = { path = "../build/kconfig" }
 build-util = { path = "../build/util" }
+serde = "1"
+ron = "0.7"
+abi = {path = "../sys/abi"}
+toml = "0.5.6"
 
 [dependencies.salty]
 git = "https://github.com/oxidecomputer/salty"
