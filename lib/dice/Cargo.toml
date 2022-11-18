@@ -27,3 +27,8 @@ rev = "eb3c31858f631a7fb9934246c8efdef080d05726"
 
 [dev-dependencies]
 chrono = "0.4"
+
+[build-dependencies]
+build-util = { path = "../../build/util" }
+serde = "1"
+toml = "0.5.6"

@@ -13,25 +13,6 @@ use lpc55_pac::syscon::RegisterBlock;
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
-// This memory is the USB peripheral SRAM that's 0x4000 bytes long. Changes
-// to this address must be coordinated with the [dice_*] tables in
-// chips/lpc55/chip.toml
-// TODO: get from app.toml -> chip.toml at build time
-const MEM_RANGE: Range<usize> = 0x4010_0000..0x4010_4000;
-const CERTS_RANGE: Range<usize> = MEM_RANGE.start..(MEM_RANGE.start + 0x800);
-const ALIAS_RANGE: Range<usize> = CERTS_RANGE.end..(CERTS_RANGE.end + 0x800);
-const SPMEASURE_RANGE: Range<usize> =
-    ALIAS_RANGE.end..(ALIAS_RANGE.end + 0x800);
-const RNG_RANGE: Range<usize> =
-    SPMEASURE_RANGE.end..(SPMEASURE_RANGE.end + 0x100);
-
-// ensure memory ranges are within MEM_RANGE and do not overlap
-sa::const_assert!(MEM_RANGE.start <= CERTS_RANGE.start);
-sa::const_assert!(CERTS_RANGE.end <= ALIAS_RANGE.start);
-sa::const_assert!(ALIAS_RANGE.end <= SPMEASURE_RANGE.start);
-sa::const_assert!(SPMEASURE_RANGE.end <= RNG_RANGE.start);
-sa::const_assert!(RNG_RANGE.end <= MEM_RANGE.end);
-
 /// The Handoff type is a thin wrapper over the memory region used to transfer
 /// DICE artifacts (seeds & certs) from stage0 to hubris tasks. It is intended
 /// for use by stage0 to write these artifacts to memory where they will later
@@ -311,3 +292,5 @@ impl RngData {
         }
     }
 }
+
+include!(concat!(env!("OUT_DIR"), "/regions.rs"));

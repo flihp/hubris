@@ -708,6 +708,7 @@ dependencies = [
 name = "dice"
 version = "0.1.0"
 dependencies = [
+ "build-util",
  "chrono",
  "dice-mfg-msgs",
  "hkdf",
@@ -720,6 +721,7 @@ dependencies = [
  "serde-big-array",
  "sha3",
  "static_assertions",
+ "toml",
  "unwrap-lite",
  "zerocopy",
  "zeroize",
