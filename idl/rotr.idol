@@ -1,0 +1,21 @@
+// Interface to Root of Trust for Reporting (ROT-R).
+
+Interface(
+    name: "Rotr",
+    ops: {
+        "record": (
+            doc: "Transmit observed measurement to ROT-R",
+            args: {
+                "hash": "[u8; 32]",
+                // more data, possibly cert w/ endorsement?
+                // probably pretty large, use lease etc
+            },
+            reply: Result(
+                ok: "()",
+                err: CLike("RotrError"),
+            ),
+        ),
+        // TODO: RPC to challenge the RoT-R for an attestation
+        // structure defined by sprockets?
+    }
+)
