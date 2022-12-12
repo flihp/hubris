@@ -4086,6 +4086,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "task-rotr"
+version = "0.1.0"
+dependencies = [
+ "dice",
+ "idol",
+ "idol-runtime",
+ "num-traits",
+ "ringbuf",
+ "stage0-handoff",
+ "task-rotr-api",
+ "userlib",
+ "zerocopy",
+]
+
+[[package]]
+name = "task-rotr-api"
+version = "0.1.0"
+dependencies = [
+ "derive-idol-err",
+ "idol",
+ "num-traits",
+ "userlib",
+ "zerocopy",
+]
+
+[[package]]
 name = "task-secure"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,18 @@
+[package]
+name = "task-rotr-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+derive-idol-err = { path = "../../lib/derive-idol-err" }
+num-traits = { workspace = true }
+userlib = {  path = "../../sys/userlib", features = ["panic-messages"]  }
+zerocopy = { workspace = true }
+
+[build-dependencies]
+idol = { workspace = true }
+
+[lib]
+name = "task_rotr_api"
+test = false
+bench = false

@@ -185,6 +185,14 @@ stacksize = 2048
 [tasks.sp_measure.config]
 binary_path = "../../target/gemini-bu/dist/final.bin"
 
+[tasks.rotr]
+name = "task-rotr"
+priority = 7
+max-sizes = {flash = 16384, ram = 16384}
+stacksize = 15360
+start = true
+uses = ["dice_certs", "dice_alias", "dice_spmeasure", "dice_rng"]
+
 [extratext.rom]
 address = 0x13000000
 size = 0x20000
