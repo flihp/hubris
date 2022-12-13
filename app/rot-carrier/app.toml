@@ -157,7 +157,7 @@ features = ["uart"]
 priority = 8
 max-sizes = {flash = 8192, ram = 2048}
 start = true
-task-slots = [{peer = "pong"}, "usart_driver"]
+task-slots = [{peer = "pong"}, "rotr", "usart_driver"]
 
 [tasks.pong]
 name = "task-pong"

@@ -5,9 +5,11 @@
 #![no_std]
 #![no_main]
 
+use task_rotr_api::Rotr;
 use userlib::*;
 
 task_slot!(PEER, peer);
+task_slot!(ROTR, rotr);
 #[cfg(feature = "uart")]
 task_slot!(UART, usart_driver);
 
@@ -38,6 +40,8 @@ fn main() -> ! {
     const PING_OP: u16 = 1;
     const FAULT_EVERY: u32 = 100;
 
+    let rotr = Rotr::from(ROTR.get_task_id());
+
     #[cfg(armv6m)]
     let faultme = [nullread];
     #[cfg(any(armv7m, armv8m))]
@@ -49,6 +53,10 @@ fn main() -> ! {
 
         let (code, _len) =
             sys_send(peer, PING_OP, b"hello", &mut response, &[]);
+
+        // send 0's to rotr task
+        let measure = [0u8; 32];
+        rotr.record(measure).expect("fml");
 
         if code % FAULT_EVERY != 0 {
             continue;

@@ -4030,6 +4030,7 @@ dependencies = [
  "build-util",
  "cortex-m",
  "drv-user-leds-api",
+ "task-rotr-api",
  "userlib",
 ]
 
