@@ -73,16 +73,8 @@ impl Image {
 
     #[cfg(any(feature = "dice-mfg", feature = "dice-self"))]
     fn get_img_size(&self) -> Option<usize> {
-        usize::try_from((unsafe { &*self.get_header() }).total_image_len).ok()
-    }
-
-    #[cfg(any(feature = "dice-mfg", feature = "dice-self"))]
-    pub fn as_bytes(&self) -> &[u8] {
-        use unwrap_lite::UnwrapLite;
-
-        let img_ptr = self.get_img_start() as *const u8;
-        let img_size = self.get_img_size().unwrap_lite();
-        unsafe { core::slice::from_raw_parts(img_ptr, img_size) }
+        let size = (unsafe { &*self.get_header() }).total_image_len + 31 & !31;
+        usize::try_from(size).ok()
     }
 
     fn get_header(&self) -> *const ImageHeader {
@@ -136,6 +128,23 @@ impl Image {
         }
 
         return true;
+    }
+
+    // TODO: This is a particularly naive way to calculate the hash of the
+    // hubris image: https://github.com/oxidecomputer/hubris/issues/736
+    #[cfg(any(feature = "dice-mfg", feature = "dice-self"))]
+    pub fn get_hash(&self) -> [u8; 32] {
+        use sha3::{Digest, Sha3_256};
+        use unwrap_lite::UnwrapLite;
+
+        let img_ptr = self.get_img_start() as *const u8;
+        let img_size = self.get_img_size().unwrap_lite() + 31 & !31;
+        let image = unsafe { core::slice::from_raw_parts(img_ptr, img_size) };
+
+        let mut img_hash = Sha3_256::new();
+        img_hash.update(image);
+
+        img_hash.finalize().try_into().expect("get_hash")
     }
 
     pub fn get_vectors(&self) -> u32 {
