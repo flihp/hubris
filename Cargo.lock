@@ -3958,6 +3958,7 @@ dependencies = [
  "dice",
  "idol",
  "idol-runtime",
+ "lpc55-pac",
  "num-traits",
  "ringbuf",
  "task-rotr-api",
