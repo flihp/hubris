@@ -6,6 +6,8 @@ edition = "2021"
 [dependencies]
 dice = { path = "../../lib/dice" }
 idol-runtime = { workspace = true }
+lpc55-pac = { workspace = true }
+lpc55-puf = { path = "../../lib/lpc55-puf" }
 num-traits = { workspace = true }
 ringbuf = { path = "../../lib/ringbuf" }
 stage0-handoff = { path = "../../lib/stage0-handoff" }

@@ -4093,6 +4093,8 @@ dependencies = [
  "dice",
  "idol",
  "idol-runtime",
+ "lpc55-pac",
+ "lpc55-puf",
  "num-traits",
  "ringbuf",
  "stage0-handoff",
