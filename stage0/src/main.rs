@@ -19,9 +19,11 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "dice-mfg")] {
         mod dice;
         mod dice_mfg_usart;
+        mod puf;
     } else if #[cfg(feature = "dice-self")] {
         mod dice;
         mod dice_mfg_self;
+        mod puf;
     }
 }
 
