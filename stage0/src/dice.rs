@@ -116,7 +116,7 @@ pub fn run(image: &Image, handoff: &Handoff, peripherals: &Peripherals) {
     let deviceid_keypair = gen_deviceid_keypair(&cdi);
 
     let mut serial_numbers =
-        gen_mfg_artifacts(&deviceid_keypair, &peripherals, handoff);
+        gen_mfg_artifacts(&deviceid_keypair, &peripherals, &handoff);
 
     let fwid = gen_fwid(image);
 

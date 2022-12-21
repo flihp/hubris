@@ -4,17 +4,24 @@
 
 use crate::dice::SerialNumbers;
 use crate::Handoff;
-use core::ops::Deref;
+use core::{mem, ops::Deref};
 use dice_crate::{
-    CertData, CertSerialNumber, DeviceIdSerialMfg, DiceMfg, SerialNumber,
-    SizedBlob,
+    Cert, CertData, CertSerialNumber, DeviceIdCertBuilder, DiceMfg,
+    PersistIdSeed, SeedBuf, SerialMfg, SerialNumber, SizedBlob,
 };
 use hubpack::SerializedSize;
 use lib_lpc55_usart::Usart;
 use lpc55_pac::Peripherals;
-use salty::signature::Keypair;
+use lpc55_puf::Puf;
+use salty::{constants::SECRETKEY_SEED_LENGTH, signature::Keypair};
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
+
+// values for PUF parameters
+const SEED_LEN: usize = SECRETKEY_SEED_LENGTH;
+const KEYCODE_LEN: usize =
+    Puf::key_to_keycode_len(SEED_LEN) / mem::size_of::<u32>();
+const KEY_INDEX: u32 = 1;
 
 macro_rules! flash_page_align {
     ($size:expr) => {
@@ -47,8 +54,9 @@ pub enum DiceStateError {
 /// serialized to flash after mfg as device identity
 #[derive(Deserialize, Serialize, SerializedSize)]
 struct DiceState {
+    pub persistid_key_code: [u32; KEYCODE_LEN],
     pub serial_number: SerialNumber,
-    pub deviceid_cert: SizedBlob,
+    pub persistid_cert: SizedBlob,
     pub intermediate_cert: SizedBlob,
 }
 
@@ -110,6 +118,29 @@ fn gen_artifacts_from_mfg(
     peripherals: &Peripherals,
     handoff: &Handoff,
 ) -> SerialNumbers {
+    let puf = Puf::new(&peripherals.PUF);
+
+    // Create key code for an ed25519 seed using the PUF. We use this seed
+    // to generate a key used as an identity that is independent from the
+    // DICE measured boot.
+    let mut id_keycode = [0u32; KEYCODE_LEN];
+    if !puf.generate_keycode(KEY_INDEX, SEED_LEN, &mut id_keycode) {
+        panic!("failed to generate key code");
+    }
+    let id_keycode = id_keycode;
+
+    // get keycode from DICE MFG flash region
+    // good opportunity to put a magic value in the DICE MFG flash region
+    let mut seed = [0u8; SEED_LEN];
+    if !puf.get_key(&id_keycode, &mut seed) {
+        panic!("failed to get ed25519 seed");
+    }
+    let seed = seed;
+
+    let id_seed = PersistIdSeed::new(seed);
+
+    let id_keypair = Keypair::from(id_seed.as_bytes());
+
     usart_setup(
         &peripherals.SYSCON,
         &peripherals.IOCON,
@@ -117,30 +148,70 @@ fn gen_artifacts_from_mfg(
     );
 
     let usart = Usart::from(peripherals.USART0.deref());
-    let mfg_state = DeviceIdSerialMfg::new(&deviceid_keypair, usart).run();
+
+    let mfg_state = SerialMfg::new(&id_keypair, usart).run();
+
+    let deviceid_cert = DeviceIdCertBuilder::new(
+        &Default::default(),
+        &mfg_state.serial_number,
+        &deviceid_keypair.public,
+    )
+    .sign(&id_keypair);
 
     let dice_state = DiceState {
-        deviceid_cert: mfg_state.deviceid_cert,
+        persistid_key_code: id_keycode,
+        persistid_cert: mfg_state.persistid_cert,
         intermediate_cert: mfg_state.intermediate_cert,
         serial_number: mfg_state.serial_number,
     };
     dice_state.to_flash().expect("DiceState::to_flash");
 
-    let cert_data =
-        CertData::new(dice_state.deviceid_cert, dice_state.intermediate_cert);
+    let cert_data = CertData::new(
+        SizedBlob::try_from(deviceid_cert.as_bytes()).unwrap(),
+        dice_state.persistid_cert,
+        dice_state.intermediate_cert,
+    );
+
     handoff.store(&cert_data);
 
+    // TODO: return DeviceId key
     SerialNumbers {
         cert_serial_number: mfg_state.cert_serial_number,
         serial_number: mfg_state.serial_number,
     }
 }
 
-fn gen_artifacts_from_flash(handoff: &Handoff) -> SerialNumbers {
+fn gen_artifacts_from_flash(
+    deviceid_keypair: &Keypair,
+    peripherals: &Peripherals,
+    handoff: &Handoff,
+) -> SerialNumbers {
     let dice_state = DiceState::from_flash().expect("DiceState::from_flash");
 
-    let cert_data =
-        CertData::new(dice_state.deviceid_cert, dice_state.intermediate_cert);
+    let puf = Puf::new(&peripherals.PUF);
+    // get keycode from DICE MFG flash region
+    let mut seed = [0u8; SEED_LEN];
+    if !puf.get_key(&dice_state.persistid_key_code, &mut seed) {
+        panic!("failed to get ed25519 seed");
+    }
+    let seed = seed;
+
+    let id_seed = PersistIdSeed::new(seed);
+
+    let id_keypair = Keypair::from(id_seed.as_bytes());
+
+    let deviceid_cert = DeviceIdCertBuilder::new(
+        &Default::default(),
+        &dice_state.serial_number,
+        &deviceid_keypair.public,
+    )
+    .sign(&id_keypair);
+
+    let cert_data = CertData::new(
+        SizedBlob::try_from(deviceid_cert.as_bytes()).unwrap(),
+        dice_state.persistid_cert,
+        dice_state.intermediate_cert,
+    );
     handoff.store(&cert_data);
 
     SerialNumbers {
@@ -155,7 +226,7 @@ pub fn gen_mfg_artifacts(
     handoff: &Handoff,
 ) -> SerialNumbers {
     if DiceState::is_programmed() {
-        gen_artifacts_from_flash(handoff)
+        gen_artifacts_from_flash(deviceid_keypair, peripherals, handoff)
     } else {
         gen_artifacts_from_mfg(deviceid_keypair, peripherals, handoff)
     }
