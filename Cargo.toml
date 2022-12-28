@@ -116,7 +116,7 @@ zerocopy = { version = "0.6.1", default-features = false }
 zeroize = { version = "1.5.7", default-features = false, features = ["zeroize_derive"] }
 
 # Oxide forks and repos
-dice-mfg-msgs = { git = "https://github.com/oxidecomputer/dice-util", default-features = false }
+dice-mfg-msgs = { path = "../dice-util/dice-mfg-msgs", default-features = false }
 gateway-messages = {git = "https://github.com/oxidecomputer/management-gateway-service", default-features = false, features = ["smoltcp"] }
 hif = { git = "https://github.com/oxidecomputer/hif", default-features = false }
 idol = { git = "https://github.com/oxidecomputer/idolatry.git", default-features = false }

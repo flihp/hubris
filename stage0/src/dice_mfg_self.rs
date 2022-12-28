@@ -3,20 +3,28 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::dice::SerialNumbers;
-use dice_crate::{CertData, DeviceIdSelfMfg, DiceMfg, Handoff};
+use crate::puf::{self, PersistIdSeed};
+use dice_crate::{CertData, DiceMfg, Handoff, SeedBuf, SelfMfg};
 use lpc55_pac::Peripherals;
 use salty::signature::Keypair;
 
 pub fn gen_mfg_artifacts(
     deviceid_keypair: &Keypair,
-    _peripherals: &Peripherals,
+    peripherals: &Peripherals,
     handoff: &Handoff,
 ) -> SerialNumbers {
-    let mfg_state = DeviceIdSelfMfg::new(&deviceid_keypair).run();
+    let keycode = puf::generate_seed(&peripherals.PUF);
+    let seed = puf::get_seed(&peripherals.PUF, &keycode);
+    let id_seed = PersistIdSeed::new(seed);
 
+    let id_keypair = Keypair::from(id_seed.as_bytes());
+
+    let mfg_state = SelfMfg::new(&id_keypair).run();
+
+    // TODO: generate DeviceId cert & stuff into CertData
     // transfer certs to CertData for serialization
     let cert_data =
-        CertData::new(mfg_state.deviceid_cert, mfg_state.intermediate_cert);
+        CertData::new(mfg_state.persistid_cert, mfg_state.intermediate_cert);
 
     handoff.store(&cert_data);
 

@@ -19,20 +19,19 @@ pub use dice_mfg_msgs::{SerialNumber, SizedBlob};
 
 mod cert;
 pub use crate::cert::{
-    AliasCert, AliasCertBuilder, Cert, CertError, DeviceIdSelfCert,
-    DeviceIdSelfCertBuilder, SpMeasureCert, SpMeasureCertBuilder,
+    AliasCert, AliasCertBuilder, Cert, CertError, PersistIdSelfCert,
+    PersistIdSelfCertBuilder, SpMeasureCert, SpMeasureCertBuilder,
     TrustQuorumDheCert, TrustQuorumDheCertBuilder,
 };
 mod csr;
-pub use crate::csr::DeviceIdCsrBuilder;
+pub use crate::csr::PersistIdCsrBuilder;
 mod alias_cert_tmpl;
 mod deviceid_cert_tmpl;
-mod deviceid_csr_tmpl;
 mod handoff;
 mod mfg;
-pub use crate::mfg::{
-    DeviceIdSelfMfg, DeviceIdSerialMfg, DiceMfg, DiceMfgState,
-};
+mod persistid_cert_tmpl;
+mod persistid_csr_tmpl;
+pub use crate::mfg::{DiceMfg, DiceMfgState, SelfMfg, SerialMfg};
 mod spmeasure_cert_tmpl;
 mod trust_quorum_dhe_cert_tmpl;
 pub use crate::handoff::{

@@ -104,6 +104,7 @@ impl DiceState {
     }
 }
 
+// TODO: why not pass the DeviceId key in?
 fn gen_artifacts_from_mfg(
     deviceid_keypair: &Keypair,
     peripherals: &Peripherals,
@@ -116,7 +117,22 @@ fn gen_artifacts_from_mfg(
     );
 
     let usart = Usart::from(peripherals.USART0.deref());
-    let mfg_state = DeviceIdSerialMfg::new(&deviceid_keypair, usart).run();
+
+    let mut keycode = [0u32; KEYCODE_LEN];
+    if !puf::generate_seed(&peripherals.PUF, &mut keycode) {
+        panic!("failed to generate key code");
+    }
+
+    // get keycode from DICE MFG flash region
+    // good opportunity to put a magic value in the DICE MFG flash region
+    let id_seed = puf::get_seed(&peripherals.PUF, &keycode);
+    let id_keypair = Keypair::from(&seed);
+
+    let mfg_state = DeviceIdSerialMfg::new(&id_keypair, usart).run();
+
+    // TODO: generate DeviceId key? must be returned to caller? should be a param
+    // TODO: generate DeviceId cert (sign w/ id_keypair)
+    // TODO: add Id cert to DiceState (remove DeviceId cert?)
 
     let dice_state = DiceState {
         deviceid_cert: mfg_state.deviceid_cert,
@@ -129,6 +145,7 @@ fn gen_artifacts_from_mfg(
         CertData::new(dice_state.deviceid_cert, dice_state.intermediate_cert);
     handoff.store(&cert_data);
 
+    // TODO: return DeviceId key
     SerialNumbers {
         cert_serial_number: mfg_state.cert_serial_number,
         serial_number: mfg_state.serial_number,
@@ -138,6 +155,7 @@ fn gen_artifacts_from_mfg(
 fn gen_artifacts_from_flash(handoff: &Handoff) -> SerialNumbers {
     let dice_state = DiceState::from_flash().expect("DiceState::from_flash");
 
+    // TODO: get AC from DiceState
     let cert_data =
         CertData::new(dice_state.deviceid_cert, dice_state.intermediate_cert);
     handoff.store(&cert_data);

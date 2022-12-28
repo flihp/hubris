@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::image_header::Image;
-use crate::puf::{self, KEYCODE_LEN, SEED_LEN};
 use dice_crate::{
     AliasCertBuilder, AliasData, AliasOkm, Cdi, CdiL1, CertSerialNumber,
     DeviceIdOkm, Handoff, RngData, RngSeed, SeedBuf, SerialNumber,
@@ -119,25 +118,10 @@ pub fn run(image: &Image) {
         None => return,
     };
 
-    // should only happend on the mfg path
-    let mut keycode = [0u32; KEYCODE_LEN];
-    if !puf::generate_seed(&peripherals.PUF, &mut keycode) {
-        panic!("failed to generate key code");
-    }
-
-    // get keycode from DICE MFG flash region
-    // good opportunity to put a magic value in the DICE MFG flash region
-    let mut seed = [0u8; SEED_LEN];
-    if !puf::get_seed(&peripherals.PUF, &keycode, &mut seed) {
-        panic!("failed to get ed25519 seed");
-    }
-
-    let id_keypair = Keypair::from(&seed);
-
     let deviceid_keypair = gen_deviceid_keypair(&cdi);
 
     let mut serial_numbers =
-        gen_mfg_artifacts(&id_keypair, &peripherals, &handoff);
+        gen_mfg_artifacts(&deviceid_keypair, &peripherals, &handoff);
 
     let fwid = gen_fwid(image);
 

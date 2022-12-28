@@ -712,7 +712,6 @@ dependencies = [
 [[package]]
 name = "dice-mfg-msgs"
 version = "0.1.0"
-source = "git+https://github.com/oxidecomputer/dice-util#5bc735ff11c6b4dcf8af598f8f3911d66db7b6ad"
 dependencies = [
  "corncobs",
  "hubpack",
@@ -3512,6 +3511,7 @@ dependencies = [
  "toml",
  "unwrap-lite",
  "zerocopy",
+ "zeroize",
 ]
 
 [[package]]

@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::{
-    cert::{Cert, DeviceIdSelfCertBuilder},
-    csr::DeviceIdCsrBuilder,
+    cert::{Cert, PersistIdSelfCertBuilder},
+    csr::PersistIdCsrBuilder,
     CertSerialNumber,
 };
 use dice_mfg_msgs::{MfgMessage, SerialNumber, SizedBlob};
@@ -26,7 +26,7 @@ pub enum Error {
 pub struct DiceMfgState {
     pub cert_serial_number: CertSerialNumber,
     pub serial_number: SerialNumber,
-    pub deviceid_cert: SizedBlob,
+    pub persistid_cert: SizedBlob,
     pub intermediate_cert: SizedBlob,
 }
 
@@ -34,23 +34,22 @@ pub trait DiceMfg {
     fn run(self) -> DiceMfgState;
 }
 
-pub struct DeviceIdSelfMfg<'a> {
+pub struct SelfMfg<'a> {
     keypair: &'a Keypair,
 }
 
-impl<'a> DeviceIdSelfMfg<'a> {
+impl<'a> SelfMfg<'a> {
     pub fn new(keypair: &'a Keypair) -> Self {
         Self { keypair }
     }
 }
 
-impl DiceMfg for DeviceIdSelfMfg<'_> {
+impl DiceMfg for SelfMfg<'_> {
     fn run(self) -> DiceMfgState {
         let mut cert_sn: CertSerialNumber = Default::default();
-        let dname_sn =
-            SerialNumber::try_from("0123456789a").expect("DeviceIdSelf SN");
+        let dname_sn = SerialNumber::try_from("0123456789a").unwrap();
 
-        let deviceid_cert = DeviceIdSelfCertBuilder::new(
+        let persistid_cert = PersistIdSelfCertBuilder::new(
             &cert_sn.next(),
             &dname_sn,
             &self.keypair.public,
@@ -61,30 +60,30 @@ impl DiceMfg for DeviceIdSelfMfg<'_> {
             cert_serial_number: cert_sn,
             serial_number: dname_sn,
             // TODO: static assert deviceid_cert size < SizedBuf max
-            deviceid_cert: SizedBlob::try_from(deviceid_cert.as_bytes())
-                .expect("deviceid cert to SizedBlob"),
+            persistid_cert: SizedBlob::try_from(persistid_cert.as_bytes())
+                .unwrap(),
             intermediate_cert: SizedBlob::default(),
         }
     }
 }
 
-pub struct DeviceIdSerialMfg<'a> {
+pub struct SerialMfg<'a> {
     keypair: &'a Keypair,
     usart: Usart<'a>,
     buf: [u8; MfgMessage::MAX_ENCODED_SIZE],
     serial_number: Option<SerialNumber>,
-    deviceid_cert: Option<SizedBlob>,
+    persistid_cert: Option<SizedBlob>,
     intermediate_cert: Option<SizedBlob>,
 }
 
-impl<'a> DeviceIdSerialMfg<'a> {
+impl<'a> SerialMfg<'a> {
     pub fn new(keypair: &'a Keypair, usart: Usart<'a>) -> Self {
         Self {
             keypair,
             usart,
             buf: [0u8; MfgMessage::MAX_ENCODED_SIZE],
             serial_number: None,
-            deviceid_cert: None,
+            persistid_cert: None,
             intermediate_cert: None,
         }
     }
@@ -95,7 +94,7 @@ impl<'a> DeviceIdSerialMfg<'a> {
     /// received.
     fn handle_break(&mut self) -> bool {
         if self.serial_number.is_none()
-            || self.deviceid_cert.is_none()
+            || self.persistid_cert.is_none()
             || self.intermediate_cert.is_none()
         {
             let _ = self.send_nak();
@@ -116,7 +115,7 @@ impl<'a> DeviceIdSerialMfg<'a> {
             return self.send_nak();
         }
 
-        let csr = DeviceIdCsrBuilder::new(
+        let csr = PersistIdCsrBuilder::new(
             &self.serial_number.unwrap(),
             &self.keypair.public,
         )
@@ -125,8 +124,8 @@ impl<'a> DeviceIdSerialMfg<'a> {
         self.send_csr(csr)
     }
 
-    fn handle_deviceid_cert(&mut self, cert: SizedBlob) -> Result<(), Error> {
-        self.deviceid_cert = Some(cert);
+    fn handle_persistid_cert(&mut self, cert: SizedBlob) -> Result<(), Error> {
+        self.persistid_cert = Some(cert);
 
         self.send_ack()
     }
@@ -148,8 +147,8 @@ impl<'a> DeviceIdSerialMfg<'a> {
         &mut self,
         serial_number: SerialNumber,
     ) -> Result<(), Error> {
-        if self.deviceid_cert.is_some() {
-            self.deviceid_cert = None;
+        if self.persistid_cert.is_some() {
+            self.persistid_cert = None;
         }
 
         self.serial_number = Some(serial_number);
@@ -188,7 +187,7 @@ impl<'a> DeviceIdSerialMfg<'a> {
     }
 }
 
-impl DiceMfg for DeviceIdSerialMfg<'_> {
+impl DiceMfg for SerialMfg<'_> {
     fn run(mut self) -> DiceMfgState {
         loop {
             let msg = match self.get_msg() {
@@ -205,9 +204,7 @@ impl DiceMfg for DeviceIdSerialMfg<'_> {
                     }
                 }
                 MfgMessage::CsrPlz => self.handle_csrplz(),
-                MfgMessage::DeviceIdCert(cert) => {
-                    self.handle_deviceid_cert(cert)
-                }
+                MfgMessage::IdCert(cert) => self.handle_persistid_cert(cert),
                 MfgMessage::IntermediateCert(cert) => {
                     self.handle_intermediate_cert(cert)
                 }
@@ -222,7 +219,7 @@ impl DiceMfg for DeviceIdSerialMfg<'_> {
         DiceMfgState {
             cert_serial_number: Default::default(),
             serial_number: self.serial_number.unwrap(),
-            deviceid_cert: self.deviceid_cert.unwrap(),
+            persistid_cert: self.persistid_cert.unwrap(),
             intermediate_cert: self.intermediate_cert.unwrap(),
         }
     }
