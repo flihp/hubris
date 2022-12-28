@@ -204,7 +204,9 @@ impl DiceMfg for SerialMfg<'_> {
                     }
                 }
                 MfgMessage::CsrPlz => self.handle_csrplz(),
-                MfgMessage::IdCert(cert) => self.handle_persistid_cert(cert),
+                MfgMessage::IdentityCert(cert) => {
+                    self.handle_persistid_cert(cert)
+                }
                 MfgMessage::IntermediateCert(cert) => {
                     self.handle_intermediate_cert(cert)
                 }
