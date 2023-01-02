@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::{
-    alias_cert_tmpl, persistid_cert_tmpl, spmeasure_cert_tmpl,
-    trust_quorum_dhe_cert_tmpl, CertSerialNumber,
+    alias_cert_tmpl, deviceid_cert_tmpl, persistid_cert_tmpl,
+    spmeasure_cert_tmpl, trust_quorum_dhe_cert_tmpl, CertSerialNumber,
 };
 use core::ops::Range;
 use dice_mfg_msgs::SerialNumber;
@@ -196,6 +196,69 @@ impl Cert for PersistIdSelfCert {
     const PUB_RANGE: Range<usize> = persistid_cert_tmpl::PUB_RANGE;
     const SIG_RANGE: Range<usize> = persistid_cert_tmpl::SIG_RANGE;
     const SIGNDATA_RANGE: Range<usize> = persistid_cert_tmpl::SIGNDATA_RANGE;
+
+    fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+// TODO: this type is brittle: The subject name in the persistent id cert
+// MUST match the issuer
+pub struct DeviceIdCertBuilder([u8; deviceid_cert_tmpl::SIZE]);
+
+impl DeviceIdCertBuilder {
+    pub fn new(
+        cert_sn: &CertSerialNumber,
+        dname_sn: &SerialNumber,
+        public_key: &PublicKey,
+    ) -> Self {
+        Self(deviceid_cert_tmpl::CERT_TMPL.clone())
+            .set_serial_number(cert_sn)
+            .set_issuer_sn(dname_sn)
+            .set_subject_sn(dname_sn)
+            .set_pub(public_key.as_bytes())
+    }
+
+    const SIGNDATA_RANGE: Range<usize> = deviceid_cert_tmpl::SIGNDATA_RANGE;
+
+    pub fn sign(self, keypair: &Keypair) -> DeviceIdCert
+    where
+        Self: Sized,
+    {
+        let signdata = &self.0[Self::SIGNDATA_RANGE];
+        let sig = keypair.sign(signdata);
+        let tmp = self.set_sig(&sig.to_bytes());
+
+        DeviceIdCert(tmp.0)
+    }
+}
+
+impl CertBuilder for DeviceIdCertBuilder {
+    const SERIAL_NUMBER_RANGE: Range<usize> =
+        deviceid_cert_tmpl::SERIAL_NUMBER_RANGE;
+    const ISSUER_SN_RANGE: Range<usize> = deviceid_cert_tmpl::ISSUER_SN_RANGE;
+    const SUBJECT_SN_RANGE: Range<usize> = deviceid_cert_tmpl::SUBJECT_SN_RANGE;
+    const PUB_RANGE: Range<usize> = deviceid_cert_tmpl::PUB_RANGE;
+    const SIG_RANGE: Range<usize> = deviceid_cert_tmpl::SIG_RANGE;
+
+    fn as_mut_bytes(&mut self) -> &mut [u8] {
+        &mut self.0
+    }
+}
+
+#[derive(Deserialize, Serialize, SerializedSize)]
+pub struct DeviceIdCert(
+    #[serde(with = "BigArray")] [u8; deviceid_cert_tmpl::SIZE],
+);
+
+impl Cert for DeviceIdCert {
+    const SERIAL_NUMBER_RANGE: Range<usize> =
+        deviceid_cert_tmpl::SERIAL_NUMBER_RANGE;
+    const ISSUER_SN_RANGE: Range<usize> = deviceid_cert_tmpl::ISSUER_SN_RANGE;
+    const SUBJECT_SN_RANGE: Range<usize> = deviceid_cert_tmpl::SUBJECT_SN_RANGE;
+    const PUB_RANGE: Range<usize> = deviceid_cert_tmpl::PUB_RANGE;
+    const SIG_RANGE: Range<usize> = deviceid_cert_tmpl::SIG_RANGE;
+    const SIGNDATA_RANGE: Range<usize> = deviceid_cert_tmpl::SIGNDATA_RANGE;
 
     fn as_bytes(&self) -> &[u8] {
         &self.0

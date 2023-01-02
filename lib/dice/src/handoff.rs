@@ -18,7 +18,7 @@ use static_assertions as sa;
 // chips/lpc55/chip.toml
 // TODO: get from app.toml -> chip.toml at build time
 const MEM_RANGE: Range<usize> = 0x4010_0000..0x4010_4000;
-const CERTS_RANGE: Range<usize> = MEM_RANGE.start..(MEM_RANGE.start + 0x800);
+const CERTS_RANGE: Range<usize> = MEM_RANGE.start..(MEM_RANGE.start + 0xa00);
 const ALIAS_RANGE: Range<usize> = CERTS_RANGE.end..(CERTS_RANGE.end + 0x800);
 const SPMEASURE_RANGE: Range<usize> =
     ALIAS_RANGE.end..(ALIAS_RANGE.end + 0x800);
@@ -129,7 +129,10 @@ pub unsafe trait HandoffData {
 #[derive(Deserialize, Serialize, SerializedSize)]
 pub struct CertData {
     pub magic: [u8; 16],
+    // TODO: this doesn't have to be a SizedBlob
+    // use DeviceIdCert type directly
     pub deviceid_cert: SizedBlob,
+    pub persistid_cert: SizedBlob,
     pub intermediate_cert: SizedBlob,
 }
 
@@ -157,10 +160,15 @@ sa::const_assert!(
 );
 
 impl CertData {
-    pub fn new(deviceid_cert: SizedBlob, intermediate_cert: SizedBlob) -> Self {
+    pub fn new(
+        deviceid_cert: SizedBlob,
+        persistid_cert: SizedBlob,
+        intermediate_cert: SizedBlob,
+    ) -> Self {
         Self {
             magic: Self::EXPECTED_MAGIC,
             deviceid_cert,
+            persistid_cert,
             intermediate_cert,
         }
     }

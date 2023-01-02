@@ -21,9 +21,15 @@ pub enum Error {
 
 // data returned to caller by MFG
 // serial_number is required to use DeviceId as embedded certificate authority
-// (ECA) post MFG. This should be written to persistent storage after
-// successful mfg
+// (ECA) post MFG
 pub struct DiceMfgState {
+    // TODO: The CertSerialNumber here represents the serial number for the
+    // PersistId CA. If this cert is signed by the manufacturing line it will
+    // be given a serial number by the mfg CA. Certs then issued by PersistId
+    // can start from cert serial number 0.
+    // When PersistId cert is self signed it's serial number will be 0 and the
+    // DeviceId cert that it issues will have a cert serial number of 1.
+    // This field tracks this state.
     pub cert_serial_number: CertSerialNumber,
     pub serial_number: SerialNumber,
     pub persistid_cert: SizedBlob,

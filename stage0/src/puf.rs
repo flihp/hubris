@@ -17,8 +17,11 @@ const KEY_INDEX: u32 = 1;
 pub struct PersistIdSeed([u8; SEED_LEN]);
 
 impl PersistIdSeed {
-    pub fn new(seed: [u8; SEED_LEN]) -> Self {
-        Self(seed)
+    pub fn from_key_code(
+        puf: &lpc55_pac::PUF,
+        key_code: &[u32; KEYCODE_LEN]
+    ) -> Self {
+        Self(get_seed(puf, &key_code))
     }
 }
 
@@ -128,7 +131,7 @@ pub fn generate_seed(puf: &lpc55_pac::PUF) -> [u32; KEYCODE_LEN] {
 
 // execute PUF GetKey command, key is returned through third param
 // TODO: this looks a lot like the constructor for PersistIdSeed?
-pub fn get_seed(
+fn get_seed(
     puf: &lpc55_pac::PUF,
     keycode: &[u32; KEYCODE_LEN],
 ) -> [u8; SEED_LEN] {

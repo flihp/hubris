@@ -19,9 +19,10 @@ pub use dice_mfg_msgs::{SerialNumber, SizedBlob};
 
 mod cert;
 pub use crate::cert::{
-    AliasCert, AliasCertBuilder, Cert, CertError, PersistIdSelfCert,
-    PersistIdSelfCertBuilder, SpMeasureCert, SpMeasureCertBuilder,
-    TrustQuorumDheCert, TrustQuorumDheCertBuilder,
+    AliasCert, AliasCertBuilder, Cert, CertError, DeviceIdCert,
+    DeviceIdCertBuilder, PersistIdSelfCert, PersistIdSelfCertBuilder,
+    SpMeasureCert, SpMeasureCertBuilder, TrustQuorumDheCert,
+    TrustQuorumDheCertBuilder,
 };
 mod csr;
 pub use crate::csr::PersistIdCsrBuilder;
@@ -158,6 +159,8 @@ impl DeviceIdOkm {
     }
 }
 
+// TODO: Start CertSerialNumber from > 0. RFD 5280 4.1.2.2: must be positive
+// integer (does not include 0).
 #[repr(C)]
 #[derive(AsBytes, Default)]
 pub struct CertSerialNumber(u8);
