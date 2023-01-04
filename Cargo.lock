@@ -2369,6 +2369,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lpc55-puf"
+version = "0.1.0"
+dependencies = [
+ "lpc55-pac",
+ "unwrap-lite",
+]
+
+[[package]]
 name = "lpc55-update-server"
 version = "0.1.0"
 dependencies = [
@@ -3959,6 +3967,7 @@ dependencies = [
  "idol",
  "idol-runtime",
  "lpc55-pac",
+ "lpc55-puf",
  "num-traits",
  "ringbuf",
  "task-rotr-api",
