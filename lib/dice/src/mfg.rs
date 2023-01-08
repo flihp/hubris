@@ -111,7 +111,7 @@ impl<'a> SerialMfg<'a> {
     }
 
     /// The Break message is an indication from the mfg side of the comms
-    /// that DeviceId manufacturing is complete. We check this as best we
+    /// that identity manufacturing is complete. We check this as best we
     /// (currently) can by ensuring all of the necessary data has been
     /// received.
     fn handle_break(&mut self) -> bool {
@@ -130,7 +130,7 @@ impl<'a> SerialMfg<'a> {
     /// Handle a request for a CSR from the mfg system requires that we have
     /// already been given a serial number. If not we NAK the message.
     /// Otherwise we use the CSR builder to create a CSR that contains the
-    /// serial number and DeviceId publie key. We then sign the CSR with the
+    /// serial number and identity public key. We then sign the CSR with the
     /// private part of the same key and send it back to the mfg system.
     fn handle_csrplz(&mut self) -> Result<(), Error> {
         if self.serial_number.is_none() {
@@ -162,9 +162,9 @@ impl<'a> SerialMfg<'a> {
     }
 
     /// Store the serial number provided by the mfg system. If we've already
-    /// received a cert for the DeviceId we invalidate it. This is to prevent
+    /// received a cert for the identity we invalidate it. This is to prevent
     /// the mfg side from changing the SN after we've used it to create the
-    /// DeviceId cert.
+    /// identity cert.
     fn handle_serial_number(
         &mut self,
         serial_number: SerialNumber,

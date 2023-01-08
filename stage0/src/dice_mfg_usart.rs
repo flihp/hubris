@@ -2,26 +2,19 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use crate::dice::SerialNumbers;
-use crate::Handoff;
-use core::{mem, ops::Deref};
+use crate::dice::{MfgResult, KEYCODE_LEN, KEY_INDEX, SEED_LEN};
+use core::ops::Deref;
 use dice_crate::{
-    Cert, CertData, CertSerialNumber, DeviceIdCertBuilder, DiceMfg,
-    PersistIdSeed, SeedBuf, SerialMfg, SerialNumber, SizedBlob,
+    CertSerialNumber, DiceMfg, PersistIdSeed, SeedBuf, SerialMfg, SerialNumber,
+    SizedBlob,
 };
 use hubpack::SerializedSize;
 use lib_lpc55_usart::Usart;
 use lpc55_pac::Peripherals;
 use lpc55_puf::Puf;
-use salty::{constants::SECRETKEY_SEED_LENGTH, signature::Keypair};
+use salty::signature::Keypair;
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
-
-// values for PUF parameters
-const SEED_LEN: usize = SECRETKEY_SEED_LENGTH;
-const KEYCODE_LEN: usize =
-    Puf::key_to_keycode_len(SEED_LEN) / mem::size_of::<u32>();
-const KEY_INDEX: u32 = 1;
 
 macro_rules! flash_page_align {
     ($size:expr) => {
@@ -113,11 +106,11 @@ impl DiceState {
     }
 }
 
-fn gen_artifacts_from_mfg(
-    deviceid_keypair: &Keypair,
-    peripherals: &Peripherals,
-    handoff: &Handoff,
-) -> SerialNumbers {
+/// Generate platform identity key from PUF and manufacture the system
+/// by certifying this identity. The certification process uses the usart
+/// peripheral to exchange manufacturing data, CSR & cert with the
+/// manufacturing line.
+fn gen_artifacts_from_mfg(peripherals: &Peripherals) -> MfgResult {
     let puf = Puf::new(&peripherals.PUF);
 
     // Create key code for an ed25519 seed using the PUF. We use this seed
@@ -149,43 +142,29 @@ fn gen_artifacts_from_mfg(
 
     let usart = Usart::from(peripherals.USART0.deref());
 
-    let mfg_state = SerialMfg::new(&id_keypair, usart).run();
-
-    let deviceid_cert = DeviceIdCertBuilder::new(
-        &Default::default(),
-        &mfg_state.serial_number,
-        &deviceid_keypair.public,
-    )
-    .sign(&id_keypair);
+    let dice_data = SerialMfg::new(&id_keypair, usart).run();
 
     let dice_state = DiceState {
         persistid_key_code: id_keycode,
-        persistid_cert: mfg_state.persistid_cert,
-        intermediate_cert: mfg_state.intermediate_cert,
-        serial_number: mfg_state.serial_number,
+        serial_number: dice_data.serial_number,
+        persistid_cert: dice_data.persistid_cert,
+        intermediate_cert: dice_data.intermediate_cert,
     };
-    dice_state.to_flash().expect("DiceState::to_flash");
 
-    let cert_data = CertData::new(
-        SizedBlob::try_from(deviceid_cert.as_bytes()).unwrap(),
-        dice_state.persistid_cert,
-        dice_state.intermediate_cert,
-    );
+    dice_state.to_flash().unwrap();
 
-    handoff.store(&cert_data);
-
-    // TODO: return DeviceId key
-    SerialNumbers {
-        cert_serial_number: mfg_state.cert_serial_number,
-        serial_number: mfg_state.serial_number,
+    MfgResult {
+        cert_serial_number: Default::default(),
+        serial_number: dice_state.serial_number,
+        persistid_keypair: id_keypair,
+        persistid_cert: dice_state.persistid_cert,
+        intermediate_cert: dice_state.intermediate_cert,
     }
 }
 
-fn gen_artifacts_from_flash(
-    deviceid_keypair: &Keypair,
-    peripherals: &Peripherals,
-    handoff: &Handoff,
-) -> SerialNumbers {
+/// Get platform identity data from the DICE flash region. This is the data
+/// we get from the 'gen_artifacts_from_mfg' function.
+fn gen_artifacts_from_flash(peripherals: &Peripherals) -> MfgResult {
     let dice_state = DiceState::from_flash().expect("DiceState::from_flash");
 
     let puf = Puf::new(&peripherals.PUF);
@@ -200,35 +179,20 @@ fn gen_artifacts_from_flash(
 
     let id_keypair = Keypair::from(id_seed.as_bytes());
 
-    let deviceid_cert = DeviceIdCertBuilder::new(
-        &Default::default(),
-        &dice_state.serial_number,
-        &deviceid_keypair.public,
-    )
-    .sign(&id_keypair);
-
-    let cert_data = CertData::new(
-        SizedBlob::try_from(deviceid_cert.as_bytes()).unwrap(),
-        dice_state.persistid_cert,
-        dice_state.intermediate_cert,
-    );
-    handoff.store(&cert_data);
-
-    SerialNumbers {
+    MfgResult {
         cert_serial_number: CertSerialNumber::default(),
         serial_number: dice_state.serial_number,
+        persistid_keypair: id_keypair,
+        persistid_cert: dice_state.persistid_cert,
+        intermediate_cert: dice_state.intermediate_cert,
     }
 }
 
-pub fn gen_mfg_artifacts(
-    deviceid_keypair: &Keypair,
-    peripherals: &Peripherals,
-    handoff: &Handoff,
-) -> SerialNumbers {
+pub fn gen_mfg_artifacts_usart(peripherals: &Peripherals) -> MfgResult {
     if DiceState::is_programmed() {
-        gen_artifacts_from_flash(deviceid_keypair, peripherals, handoff)
+        gen_artifacts_from_flash(peripherals)
     } else {
-        gen_artifacts_from_mfg(deviceid_keypair, peripherals, handoff)
+        gen_artifacts_from_mfg(peripherals)
     }
 }
 
