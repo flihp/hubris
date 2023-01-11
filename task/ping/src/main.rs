@@ -5,7 +5,27 @@
 #![no_std]
 #![no_main]
 
+use core::mem;
+use lpc55_pac::Peripherals;
+use lpc55_puf::Puf;
+use ringbuf::{ringbuf, ringbuf_entry};
 use userlib::*;
+
+#[derive(Copy, Clone, PartialEq)]
+enum Trace {
+    KeyCode([u32; KEYCODE_LEN]),
+    Seed([u8; SEED_LEN]),
+    IdxBlkL(u32),
+    IdxBlkH(u32),
+    GetKeyFail,
+    None,
+}
+ringbuf!(Trace, 32, Trace::None);
+
+pub const SEED_LEN: usize = 32;
+pub const KEYCODE_LEN: usize =
+    Puf::key_to_keycode_len(SEED_LEN) / mem::size_of::<u32>();
+pub const KEY_INDEX: u32 = 1;
 
 task_slot!(PEER, peer);
 #[cfg(feature = "uart")]
@@ -32,11 +52,69 @@ fn divzero() {
     }
 }
 
+fn use_index(puf: &Puf, index: u32) -> bool {
+    let mut keycode = [0u32; KEYCODE_LEN];
+    if !puf.generate_keycode(index, SEED_LEN, &mut keycode) {
+        panic!("failed to generate key code");
+    }
+    ringbuf_entry!(Trace::KeyCode(keycode));
+
+    // get keycode from DICE MFG flash region
+    // good opportunity to put a magic value in the DICE MFG flash region
+    let mut seed = [0u8; SEED_LEN];
+    if puf.get_key(&keycode, &mut seed) {
+        let seed = seed;
+        ringbuf_entry!(Trace::Seed(seed));
+    } else {
+        ringbuf_entry!(Trace::GetKeyFail);
+    }
+    true
+}
+
+fn dump_idxblks(puf: &Puf) {
+    ringbuf_entry!(Trace::IdxBlkL(puf.get_idxblk_l()));
+    ringbuf_entry!(Trace::IdxBlkH(puf.get_idxblk_h()));
+
+    // The IDXBLK_(L|H)_DP registers don't appear to do anything.
+    // They're always 0 while the IDXBLK_(L|H) registers work as
+    // advertised. If these register sets disagree then the PUF index
+    // should be blocked but experimentation shows this isn't the case.
+    //
+    //ringbuf_entry!(Trace::IdxBlkLDp(puf.get_idxblk_l_dp()));
+    //ringbuf_entry!(Trace::IdxBlkHDp(puf.get_idxblk_h_dp()));
+}
+
 #[export_name = "main"]
 fn main() -> ! {
     let peer = PEER.get_task_id();
     const PING_OP: u16 = 1;
     const FAULT_EVERY: u32 = 100;
+
+    let peripherals = Peripherals::take().unwrap_lite();
+
+    let puf = peripherals.PUF;
+    let puf = Puf::new(&puf);
+    let key_index = 1;
+
+    dump_idxblks(&puf);
+    use_index(&puf, key_index);
+
+    let key_index = 2;
+
+    dump_idxblks(&puf);
+    use_index(&puf, key_index);
+
+    //hl::sleep_for(1000);
+
+    //puf.block_index(key_index);
+    //puf.lock_indices_low();
+
+    //dump_idxblks(&puf);
+    //use_index(&puf, key_index);
+
+    //puf.unblock_index(key_index);
+    //dump_idxblks(&puf);
+    //use_index(&puf, key_index);
 
     #[cfg(armv6m)]
     let faultme = [nullread];

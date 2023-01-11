@@ -14,6 +14,10 @@ size = 9348
 address = 0x40001000
 size = 4096
 
+[puf]
+address = 0x4003b000
+size = 0x260
+
 [flexcomm0]
 address = 0x40086000
 size = 4096

@@ -4046,6 +4046,10 @@ dependencies = [
  "build-util",
  "cortex-m",
  "drv-user-leds-api",
+ "lpc55-pac",
+ "lpc55-puf",
+ "ringbuf",
+ "salty",
  "userlib",
 ]
 

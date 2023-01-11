@@ -20,8 +20,8 @@ stacksize = 256
 start = true
 
 [signing]
-enable-secure-boot = true
-enable-dice = true
+enable-secure-boot = false
+enable-dice = false
 dice-inc-nxp-cfg = false
 dice-cust-cfg = false
 dice-inc-sec-epoch = false

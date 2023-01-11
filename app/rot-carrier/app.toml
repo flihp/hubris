@@ -155,9 +155,11 @@ task-slots = ["swd"]
 name = "task-ping"
 features = ["uart"]
 priority = 8
-max-sizes = {flash = 8192, ram = 2048}
+max-sizes = {flash = 32768, ram = 16384}
 start = true
+uses = ["puf"]
 task-slots = [{peer = "pong"}, "usart_driver"]
+stacksize = 8192
 
 [tasks.pong]
 name = "task-pong"
