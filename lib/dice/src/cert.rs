@@ -76,6 +76,15 @@ pub trait Cert: AsBytes {
     }
 }
 
+/// Trait for Certs with the TCG DICE TcbInfo structure w/ the FWID member.
+pub trait FwidCert: Cert {
+    const FWID_RANGE: Range<usize>;
+
+    fn get_fwid(&self) -> &[u8] {
+        self.get_range(Self::FWID_RANGE)
+    }
+}
+
 pub trait CertBuilder: AsBytes + FromBytes {
     fn set_range<T: AsBytes>(mut self, r: Range<usize>, t: &T) -> Self
     where
@@ -280,12 +289,6 @@ impl CertBuilder for AliasCertBuilder {
 #[repr(C)]
 pub struct AliasCert(#[serde(with = "BigArray")] [u8; alias_cert_tmpl::SIZE]);
 
-impl AliasCert {
-    pub fn get_fwid(&self) -> &[u8] {
-        self.get_range(alias_cert_tmpl::FWID_RANGE)
-    }
-}
-
 impl Cert for AliasCert {
     const SERIAL_NUMBER_RANGE: Range<usize> =
         alias_cert_tmpl::SERIAL_NUMBER_RANGE;
@@ -294,6 +297,10 @@ impl Cert for AliasCert {
     const PUB_RANGE: Range<usize> = alias_cert_tmpl::PUB_RANGE;
     const SIG_RANGE: Range<usize> = alias_cert_tmpl::SIG_RANGE;
     const SIGNDATA_RANGE: Range<usize> = alias_cert_tmpl::SIGNDATA_RANGE;
+}
+
+impl FwidCert for AliasCert {
+    const FWID_RANGE: Range<usize> = alias_cert_tmpl::FWID_RANGE;
 }
 
 #[derive(AsBytes, FromBytes)]
@@ -350,12 +357,6 @@ pub struct SpMeasureCert(
     #[serde(with = "BigArray")] [u8; spmeasure_cert_tmpl::SIZE],
 );
 
-impl SpMeasureCert {
-    pub fn get_fwid(&self) -> &[u8] {
-        self.get_range(spmeasure_cert_tmpl::FWID_RANGE)
-    }
-}
-
 impl Cert for SpMeasureCert {
     const SERIAL_NUMBER_RANGE: Range<usize> =
         spmeasure_cert_tmpl::SERIAL_NUMBER_RANGE;
@@ -365,6 +366,10 @@ impl Cert for SpMeasureCert {
     const PUB_RANGE: Range<usize> = spmeasure_cert_tmpl::PUB_RANGE;
     const SIG_RANGE: Range<usize> = spmeasure_cert_tmpl::SIG_RANGE;
     const SIGNDATA_RANGE: Range<usize> = spmeasure_cert_tmpl::SIGNDATA_RANGE;
+}
+
+impl FwidCert for SpMeasureCert {
+    const FWID_RANGE: Range<usize> = spmeasure_cert_tmpl::FWID_RANGE;
 }
 
 #[derive(AsBytes, FromBytes)]
@@ -422,12 +427,6 @@ pub struct TrustQuorumDheCert(
     #[serde(with = "BigArray")] [u8; trust_quorum_dhe_cert_tmpl::SIZE],
 );
 
-impl TrustQuorumDheCert {
-    pub fn get_fwid(&self) -> &[u8] {
-        self.get_range(trust_quorum_dhe_cert_tmpl::FWID_RANGE)
-    }
-}
-
 impl Cert for TrustQuorumDheCert {
     const SERIAL_NUMBER_RANGE: Range<usize> =
         trust_quorum_dhe_cert_tmpl::SERIAL_NUMBER_RANGE;
@@ -439,6 +438,10 @@ impl Cert for TrustQuorumDheCert {
     const SIG_RANGE: Range<usize> = trust_quorum_dhe_cert_tmpl::SIG_RANGE;
     const SIGNDATA_RANGE: Range<usize> =
         trust_quorum_dhe_cert_tmpl::SIGNDATA_RANGE;
+}
+
+impl FwidCert for TrustQuorumDheCert {
+    const FWID_RANGE: Range<usize> = trust_quorum_dhe_cert_tmpl::FWID_RANGE;
 }
 
 #[cfg(test)]
