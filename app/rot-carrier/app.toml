@@ -10,7 +10,7 @@ version = 0
 [kernel]
 name = "rot-carrier"
 features = ["dice-self"]
-requires = {flash = 52032, ram = 4096}
+requires = {flash = 52544, ram = 4096}
 
 [tasks.jefe]
 name = "task-jefe"

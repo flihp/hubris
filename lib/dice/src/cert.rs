@@ -17,7 +17,7 @@ use salty::signature::{Keypair, PublicKey};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use unwrap_lite::UnwrapLite;
-use zerocopy::AsBytes;
+use zerocopy::{AsBytes, FromBytes};
 
 #[derive(Debug)]
 pub enum CertError {
@@ -30,9 +30,7 @@ pub enum CertError {
     NoCn,
 }
 
-pub trait Cert {
-    fn as_bytes(&self) -> &[u8];
-
+pub trait Cert: AsBytes {
     fn get_range<'a, T>(&'a self, r: Range<usize>) -> T
     where
         T: TryFrom<&'a [u8]>,
@@ -78,14 +76,12 @@ pub trait Cert {
     }
 }
 
-pub trait CertBuilder {
-    fn as_mut_bytes(&mut self) -> &mut [u8];
-
+pub trait CertBuilder: AsBytes + FromBytes {
     fn set_range<T: AsBytes>(mut self, r: Range<usize>, t: &T) -> Self
     where
         Self: Sized,
     {
-        self.as_mut_bytes()[r].copy_from_slice(t.as_bytes());
+        self.as_bytes_mut()[r].copy_from_slice(t.as_bytes());
 
         self
     }
@@ -136,6 +132,8 @@ pub trait CertBuilder {
     }
 }
 
+#[derive(AsBytes, FromBytes)]
+#[repr(C)]
 pub struct PersistIdSelfCertBuilder([u8; persistid_cert_tmpl::SIZE]);
 
 impl PersistIdSelfCertBuilder {
@@ -173,14 +171,12 @@ impl CertBuilder for PersistIdSelfCertBuilder {
         persistid_cert_tmpl::SUBJECT_SN_RANGE;
     const PUB_RANGE: Range<usize> = persistid_cert_tmpl::PUB_RANGE;
     const SIG_RANGE: Range<usize> = persistid_cert_tmpl::SIG_RANGE;
-
-    fn as_mut_bytes(&mut self) -> &mut [u8] {
-        &mut self.0
-    }
 }
 
 // TODO: this type is brittle: The subject name in the persistent id cert
 // MUST match the issuer
+#[derive(AsBytes, FromBytes)]
+#[repr(C)]
 pub struct DeviceIdCertBuilder([u8; deviceid_cert_tmpl::SIZE]);
 
 impl DeviceIdCertBuilder {
@@ -215,13 +211,10 @@ impl CertBuilder for DeviceIdCertBuilder {
     const SUBJECT_SN_RANGE: Range<usize> = deviceid_cert_tmpl::SUBJECT_SN_RANGE;
     const PUB_RANGE: Range<usize> = deviceid_cert_tmpl::PUB_RANGE;
     const SIG_RANGE: Range<usize> = deviceid_cert_tmpl::SIG_RANGE;
-
-    fn as_mut_bytes(&mut self) -> &mut [u8] {
-        &mut self.0
-    }
 }
 
-#[derive(Deserialize, Serialize, SerializedSize)]
+#[derive(AsBytes, Deserialize, FromBytes, Serialize, SerializedSize)]
+#[repr(C)]
 pub struct DeviceIdCert(
     #[serde(with = "BigArray")] [u8; deviceid_cert_tmpl::SIZE],
 );
@@ -234,12 +227,10 @@ impl Cert for DeviceIdCert {
     const PUB_RANGE: Range<usize> = deviceid_cert_tmpl::PUB_RANGE;
     const SIG_RANGE: Range<usize> = deviceid_cert_tmpl::SIG_RANGE;
     const SIGNDATA_RANGE: Range<usize> = deviceid_cert_tmpl::SIGNDATA_RANGE;
-
-    fn as_bytes(&self) -> &[u8] {
-        &self.0
-    }
 }
 
+#[derive(AsBytes, FromBytes)]
+#[repr(C)]
 pub struct AliasCertBuilder([u8; alias_cert_tmpl::SIZE]);
 
 impl AliasCertBuilder {
@@ -283,13 +274,10 @@ impl CertBuilder for AliasCertBuilder {
     const SUBJECT_SN_RANGE: Range<usize> = alias_cert_tmpl::SUBJECT_SN_RANGE;
     const PUB_RANGE: Range<usize> = alias_cert_tmpl::PUB_RANGE;
     const SIG_RANGE: Range<usize> = alias_cert_tmpl::SIG_RANGE;
-
-    fn as_mut_bytes(&mut self) -> &mut [u8] {
-        &mut self.0
-    }
 }
 
-#[derive(Deserialize, Serialize, SerializedSize)]
+#[derive(AsBytes, Deserialize, FromBytes, Serialize, SerializedSize)]
+#[repr(C)]
 pub struct AliasCert(#[serde(with = "BigArray")] [u8; alias_cert_tmpl::SIZE]);
 
 impl AliasCert {
@@ -306,12 +294,10 @@ impl Cert for AliasCert {
     const PUB_RANGE: Range<usize> = alias_cert_tmpl::PUB_RANGE;
     const SIG_RANGE: Range<usize> = alias_cert_tmpl::SIG_RANGE;
     const SIGNDATA_RANGE: Range<usize> = alias_cert_tmpl::SIGNDATA_RANGE;
-
-    fn as_bytes(&self) -> &[u8] {
-        &self.0
-    }
 }
 
+#[derive(AsBytes, FromBytes)]
+#[repr(C)]
 pub struct SpMeasureCertBuilder([u8; spmeasure_cert_tmpl::SIZE]);
 
 impl SpMeasureCertBuilder {
@@ -356,13 +342,10 @@ impl CertBuilder for SpMeasureCertBuilder {
         spmeasure_cert_tmpl::SUBJECT_SN_RANGE;
     const PUB_RANGE: Range<usize> = spmeasure_cert_tmpl::PUB_RANGE;
     const SIG_RANGE: Range<usize> = spmeasure_cert_tmpl::SIG_RANGE;
-
-    fn as_mut_bytes(&mut self) -> &mut [u8] {
-        &mut self.0
-    }
 }
 
-#[derive(Deserialize, Serialize, SerializedSize)]
+#[derive(AsBytes, Deserialize, FromBytes, Serialize, SerializedSize)]
+#[repr(C)]
 pub struct SpMeasureCert(
     #[serde(with = "BigArray")] [u8; spmeasure_cert_tmpl::SIZE],
 );
@@ -382,12 +365,10 @@ impl Cert for SpMeasureCert {
     const PUB_RANGE: Range<usize> = spmeasure_cert_tmpl::PUB_RANGE;
     const SIG_RANGE: Range<usize> = spmeasure_cert_tmpl::SIG_RANGE;
     const SIGNDATA_RANGE: Range<usize> = spmeasure_cert_tmpl::SIGNDATA_RANGE;
-
-    fn as_bytes(&self) -> &[u8] {
-        &self.0
-    }
 }
 
+#[derive(AsBytes, FromBytes)]
+#[repr(C)]
 pub struct TrustQuorumDheCertBuilder([u8; trust_quorum_dhe_cert_tmpl::SIZE]);
 
 impl TrustQuorumDheCertBuilder {
@@ -433,13 +414,10 @@ impl CertBuilder for TrustQuorumDheCertBuilder {
         trust_quorum_dhe_cert_tmpl::SUBJECT_SN_RANGE;
     const PUB_RANGE: Range<usize> = trust_quorum_dhe_cert_tmpl::PUB_RANGE;
     const SIG_RANGE: Range<usize> = trust_quorum_dhe_cert_tmpl::SIG_RANGE;
-
-    fn as_mut_bytes(&mut self) -> &mut [u8] {
-        &mut self.0
-    }
 }
 
-#[derive(Deserialize, Serialize, SerializedSize)]
+#[derive(AsBytes, Deserialize, FromBytes, Serialize, SerializedSize)]
+#[repr(C)]
 pub struct TrustQuorumDheCert(
     #[serde(with = "BigArray")] [u8; trust_quorum_dhe_cert_tmpl::SIZE],
 );
@@ -461,10 +439,6 @@ impl Cert for TrustQuorumDheCert {
     const SIG_RANGE: Range<usize> = trust_quorum_dhe_cert_tmpl::SIG_RANGE;
     const SIGNDATA_RANGE: Range<usize> =
         trust_quorum_dhe_cert_tmpl::SIGNDATA_RANGE;
-
-    fn as_bytes(&self) -> &[u8] {
-        &self.0
-    }
 }
 
 #[cfg(test)]
