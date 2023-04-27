@@ -21,7 +21,7 @@ pub use dice_mfg_msgs::{SerialNumber, SizedBlob};
 mod cert;
 pub use crate::cert::{
     AliasCert, AliasCertBuilder, Cert, CertError, DeviceIdCert,
-    DeviceIdCertBuilder, PersistIdSelfCertBuilder, SpMeasureCert,
+    DeviceIdCertBuilder, FwidCert, PersistIdSelfCertBuilder, SpMeasureCert,
     SpMeasureCertBuilder, TrustQuorumDheCert, TrustQuorumDheCertBuilder,
 };
 mod csr;
