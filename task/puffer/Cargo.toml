@@ -1,0 +1,15 @@
+[package]
+name = "task-puffer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lpc55-pac = { workspace = true, features = ["rt"] }
+lpc55-puf = { path = "../../lib/lpc55-puf" }
+ringbuf = { path = "../../lib/ringbuf" }
+userlib = { path = "../../sys/userlib", features = ["panic-messages"] }
+
+[[bin]]
+name = "task-puffer"
+test = false
+bench = false

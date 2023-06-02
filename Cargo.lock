@@ -4269,6 +4269,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "task-puffer"
+version = "0.1.0"
+dependencies = [
+ "lpc55-pac",
+ "lpc55-puf",
+ "ringbuf",
+ "userlib",
+]
+
+[[package]]
 name = "task-secure"
 version = "0.1.0"
 dependencies = [

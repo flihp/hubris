@@ -8,7 +8,7 @@ image-names = ["a", "b"]
 [kernel]
 name = "lpc55xpresso"
 features = ["dump", "dice-self"]
-requires = {flash = 53888, ram = 4096}
+requires = {flash = 54000, ram = 4096}
 
 [tasks.jefe]
 name = "task-jefe"
@@ -132,6 +132,14 @@ start = true
 task-slots = ["jefe"]
 stacksize = 1200
 extern-regions = ["sram2"]
+
+[tasks.puffer]
+name = "task-puffer"
+priority = 6
+max-sizes = {flash = 32768, ram = 16384}
+stacksize = 15000
+start = true
+uses = ["puf"]
 
 [signing]
 enable-secure-boot = true
