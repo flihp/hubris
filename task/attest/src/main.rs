@@ -27,7 +27,7 @@ enum Trace {
     Fwid([u8; FWID_LENGTH]),
     BufSize(usize),
     Index(u32),
-    Offset(usize),
+    Offset(u32),
     Startup,
     None,
 }
@@ -111,10 +111,15 @@ impl idl::InOrderAttestImpl for AttestServer<'_> {
         &mut self,
         _: &userlib::RecvMessage,
         index: u32,
-    ) -> Result<usize, RequestError<AttestError>> {
+    ) -> Result<u32, RequestError<AttestError>> {
         let len = self.get_cert_bytes_from_index(index)?.len();
-
         ringbuf_entry!(Trace::CertLen(len));
+        let len = u32::try_from(len).map_err(|_| {
+            <AttestError as Into<RequestError<AttestError>>>::into(
+                AttestError::CertTooBig,
+            )
+        })?;
+
         Ok(len)
     }
 
@@ -123,7 +128,7 @@ impl idl::InOrderAttestImpl for AttestServer<'_> {
         &mut self,
         _: &userlib::RecvMessage,
         index: u32,
-        offset: usize,
+        offset: u32,
         dest: Leased<W, [u8]>,
     ) -> Result<(), RequestError<AttestError>> {
         ringbuf_entry!(Trace::Cert);
@@ -139,12 +144,13 @@ impl idl::InOrderAttestImpl for AttestServer<'_> {
         }
 
         // there must be sufficient data read from cert to fill the lease
-        if dest.len() > cert.len() - offset {
+        if dest.len() > cert.len() - offset as usize {
             let err = AttestError::OutOfRange;
             ringbuf_entry!(Trace::Error(err));
             return Err(err.into());
         }
 
+        let offset = offset as usize;
         dest.write_range(0..dest.len(), &cert[offset..offset + dest.len()])
             .map_err(|_| RequestError::Fail(ClientError::WentAway))?;
 

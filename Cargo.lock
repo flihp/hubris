@@ -79,9 +79,11 @@ name = "attest-api"
 version = "0.1.0"
 dependencies = [
  "derive-idol-err",
+ "hubpack",
  "idol",
  "idol-runtime",
  "num-traits",
+ "serde",
  "userlib",
  "zerocopy",
 ]
@@ -3837,10 +3839,12 @@ version = "0.1.0"
 dependencies = [
  "attest-api",
  "dice",
+ "hubpack",
  "idol",
  "idol-runtime",
  "num-traits",
  "ringbuf",
+ "serde",
  "stage0-handoff",
  "unwrap-lite",
  "userlib",
