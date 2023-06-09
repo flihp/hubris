@@ -16,6 +16,7 @@ use userlib::sys_send;
 pub enum AttestError {
     CertTooBig,
     InvalidCertIndex,
+    NoCerts,
     OutOfRange,
 }
 

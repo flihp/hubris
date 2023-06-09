@@ -14,7 +14,7 @@ use core::mem::MaybeUninit;
 use dice::{AliasData, CertData};
 use idol_runtime::{ClientError, Leased, RequestError, W};
 use ringbuf::{ringbuf, ringbuf_entry};
-use stage0_handoff::HandoffData;
+use stage0_handoff::{HandoffData, HandoffDataLoadError};
 use zerocopy::AsBytes;
 
 #[derive(Copy, Clone, PartialEq)]
@@ -22,7 +22,8 @@ enum Trace {
     Cert,
     CertChainLen(u32),
     CertLen(usize),
-    Error(AttestError),
+    AttestError(AttestError),
+    HandoffError(HandoffDataLoadError),
     BufSize(usize),
     Index(u32),
     Offset(u32),
@@ -44,16 +45,52 @@ static CERTS: MaybeUninit<[u8; 0xa00]> = MaybeUninit::uninit();
 #[link_section = ".dice_alias"]
 static ALIAS: MaybeUninit<[u8; 0x800]> = MaybeUninit::uninit();
 
-struct AttestServer<'a> {
-    alias_data: &'a AliasData,
-    cert_data: &'a CertData,
+struct AttestServer {
+    alias_data: Option<AliasData>,
+    cert_data: Option<CertData>,
 }
 
-impl<'a> AttestServer<'a> {
-    fn new(alias: &'a AliasData, certs: &'a CertData) -> Self {
+impl Default for AttestServer {
+    fn default() -> Self {
+        // Safety: This memory is setup by code executed before hubris.
+        let addr = unsafe { ALIAS.assume_init_ref() };
+        let alias_data = match AliasData::load_from_addr(addr) {
+            Ok(d) => Some(d),
+            Err(e) => {
+                ringbuf_entry!(Trace::HandoffError(e));
+                None
+            }
+        };
+
+        // Safety: This memory is setup by code executed before hubris.
+        let addr = unsafe { CERTS.assume_init_ref() };
+        let cert_data = match CertData::load_from_addr(addr) {
+            Ok(d) => Some(d),
+            Err(e) => {
+                ringbuf_entry!(Trace::HandoffError(e));
+                None
+            }
+        };
+
         Self {
-            alias_data: alias,
-            cert_data: certs,
+            alias_data,
+            cert_data,
+        }
+    }
+}
+
+impl AttestServer {
+    fn get_alias_data(&self) -> Result<&AliasData, AttestError> {
+       match &self.alias_data {
+           Some(d) => Ok(d),
+           None => Err(AttestError::NoCerts.into())
+        }
+    }
+
+    fn get_cert_data(&self) -> Result<&CertData, AttestError> {
+       match &self.cert_data {
+           Some(d) => Ok(d),
+           None => Err(AttestError::NoCerts.into())
         }
     }
 
@@ -61,17 +98,20 @@ impl<'a> AttestServer<'a> {
         &self,
         index: u32,
     ) -> Result<&[u8], RequestError<AttestError>> {
+        let alias_data = self.get_alias_data()?;
+        let cert_data = self.get_cert_data()?;
+
         match index {
             // Cert chains start with the leaf and stop at the last
             // intermediate before the root. We mimic an array with
             // the leaf cert at index 0, and the last intermediate as
             // the chain length - 1.
-            0 => Ok(self.alias_data.alias_cert.as_bytes()),
-            1 => Ok(self.cert_data.deviceid_cert.as_bytes()),
-            2 => Ok(&self.cert_data.persistid_cert.0.as_bytes()
-                [0..self.cert_data.persistid_cert.0.size as usize]),
+            0 => Ok(alias_data.alias_cert.as_bytes()),
+            1 => Ok(cert_data.deviceid_cert.as_bytes()),
+            2 => Ok(&cert_data.persistid_cert.0.as_bytes()
+                [0..cert_data.persistid_cert.0.size as usize]),
             3 => {
-                if let Some(cert) = self.cert_data.intermediate_cert.as_ref() {
+                if let Some(cert) = cert_data.intermediate_cert.as_ref() {
                     Ok(&cert.0.as_bytes()[0..cert.0.size as usize])
                 } else {
                     Err(AttestError::InvalidCertIndex.into())
@@ -82,19 +122,20 @@ impl<'a> AttestServer<'a> {
     }
 }
 
-impl idl::InOrderAttestImpl for AttestServer<'_> {
+impl idl::InOrderAttestImpl for AttestServer {
     /// Get length of cert chain from Alias to mfg intermediate
     fn cert_chain_len(
         &mut self,
         _: &userlib::RecvMessage,
     ) -> Result<u32, RequestError<AttestError>> {
+        let cert_data = self.get_cert_data()?;
         // The cert chain will vary in length:
         // - kernel w/ feature 'dice-self' will have 3 certs in the chain w/
         // the final cert being a self signed, puf derived identity key
         // - kernel /w feature 'dice-mfg' will have 4 certs in the chain w/
         // the final cert being the intermediate that signs the identity
         // cert
-        let chain_len = if self.cert_data.intermediate_cert.is_none() {
+        let chain_len = if cert_data.intermediate_cert.is_none() {
             3
         } else {
             4
@@ -112,6 +153,7 @@ impl idl::InOrderAttestImpl for AttestServer<'_> {
     ) -> Result<u32, RequestError<AttestError>> {
         let len = self.get_cert_bytes_from_index(index)?.len();
         ringbuf_entry!(Trace::CertLen(len));
+
         let len = u32::try_from(len).map_err(|_| {
             <AttestError as Into<RequestError<AttestError>>>::into(
                 AttestError::CertTooBig,
@@ -137,14 +179,14 @@ impl idl::InOrderAttestImpl for AttestServer<'_> {
         let cert = self.get_cert_bytes_from_index(index)?;
         if cert.is_empty() {
             let err = AttestError::InvalidCertIndex;
-            ringbuf_entry!(Trace::Error(err));
+            ringbuf_entry!(Trace::AttestError(err));
             return Err(err.into());
         }
 
         // there must be sufficient data read from cert to fill the lease
         if dest.len() > cert.len() - offset as usize {
             let err = AttestError::OutOfRange;
-            ringbuf_entry!(Trace::Error(err));
+            ringbuf_entry!(Trace::AttestError(err));
             return Err(err.into());
         }
 
@@ -160,20 +202,8 @@ impl idl::InOrderAttestImpl for AttestServer<'_> {
 fn main() -> ! {
     ringbuf_entry!(Trace::Startup);
 
-    let addr = unsafe { CERTS.assume_init_ref() };
-    let cert_data = match CertData::load_from_addr(addr) {
-        Ok(a) => a,
-        Err(_) => panic!("CertData"),
-    };
-
-    let addr = unsafe { ALIAS.assume_init_ref() };
-    let alias_data = match AliasData::load_from_addr(addr) {
-        Ok(a) => a,
-        Err(_) => panic!("AliasData"),
-    };
-
     let mut buffer = [0; idl::INCOMING_SIZE];
-    let mut attest = AttestServer::new(&alias_data, &cert_data);
+    let mut attest = AttestServer::default();
     loop {
         idol_runtime::dispatch(&mut buffer, &mut attest);
     }
