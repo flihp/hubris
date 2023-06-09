@@ -4,7 +4,7 @@
 
 //! Root of trust for reporting (RoT-R) task.
 //!
-//! Use the rotr-api crate to interact with this task.
+//! Use the attest-api crate to interact with this task.
 
 #![no_std]
 #![no_main]
