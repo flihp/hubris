@@ -33,6 +33,13 @@ enum Trace {
 
 ringbuf!(Trace, 16, Trace::None);
 
+// NOTE: Our use of 'link_section' below relies on the behavior of `xtask`.
+// The sizes assigned to each of these sections in the app.toml is the
+// same as the sizes of the MaybeUninit inner types below. This causes
+// both of the MaybeUninits to be mapped to the base of memory in their
+// respective sections.
+// TODO: consider replacing with the `extern-region` mechanism
+
 // Map the memory used to pass the segment of the identity cert chain common
 // to all tasks to a variable.
 #[used]
