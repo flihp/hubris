@@ -11,11 +11,10 @@
 
 use attest_api::AttestError;
 use core::mem::MaybeUninit;
-use dice::{AliasData, CertData, FwidCert, FWID_LENGTH};
+use dice::{AliasData, CertData};
 use idol_runtime::{ClientError, Leased, RequestError, W};
 use ringbuf::{ringbuf, ringbuf_entry};
 use stage0_handoff::HandoffData;
-use userlib::UnwrapLite;
 use zerocopy::AsBytes;
 
 #[derive(Copy, Clone, PartialEq)]
@@ -24,7 +23,6 @@ enum Trace {
     CertChainLen(u32),
     CertLen(usize),
     Error(AttestError),
-    Fwid([u8; FWID_LENGTH]),
     BufSize(usize),
     Index(u32),
     Offset(u32),
@@ -173,9 +171,6 @@ fn main() -> ! {
         Ok(a) => a,
         Err(_) => panic!("AliasData"),
     };
-
-    let fwid = alias_data.alias_cert.get_fwid();
-    ringbuf_entry!(Trace::Fwid(fwid.try_into().unwrap_lite()));
 
     let mut buffer = [0; idl::INCOMING_SIZE];
     let mut attest = AttestServer::new(&alias_data, &cert_data);
