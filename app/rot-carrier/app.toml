@@ -208,6 +208,7 @@ max-sizes = {flash = 12512, ram = 8192, dice_alias = 2048, dice_certs = 2560}
 stacksize = 7000
 start = true
 sections = {dice_alias = "dice_alias", dice_certs = "dice_certs"}
+extern-regions = ["dice_alias", "dice_certs"]
 
 [signing]
 enable-secure-boot = true

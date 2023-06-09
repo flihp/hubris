@@ -17,7 +17,10 @@ userlib = { path = "../../sys/userlib", features = ["panic-messages"] }
 zerocopy = { workspace = true }
 
 [build-dependencies]
+anyhow = { workspace = true }
+build-util = { path = "../../build/util" }
 idol = { workspace = true }
+serde = { workspace = true }
 
 [[bin]]
 name = "task-attest"
