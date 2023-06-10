@@ -1,0 +1,21 @@
+[package]
+name = "task-null-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+null-api.path = "../../lib/null-api"
+ringbuf.path = "../../lib/ringbuf"
+serde.workspace = true
+userlib = { path = "../../sys/userlib", features = ["panic-messages"] }
+
+[build-dependencies]
+anyhow.workspace = true
+build-util.path = "../../build/util"
+
+# This section is here to discourage RLS/rust-analyzer from doing test builds,
+# since test builds don't work for cross compilation.
+[[bin]]
+name = "task-null-client"
+test = false
+bench = false

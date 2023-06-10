@@ -4378,6 +4378,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "task-null-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "build-util",
+ "null-api",
+ "ringbuf",
+ "serde",
+ "userlib",
+]
+
+[[package]]
 name = "task-null-server"
 version = "0.1.0"
 dependencies = [
