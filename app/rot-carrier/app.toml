@@ -210,6 +210,14 @@ stacksize = 12000
 start = true
 extern-regions = ["dice_alias", "dice_certs"]
 
+[tasks.null]
+name = "task-null"
+priority = 6
+max-sizes = {flash = 12000, ram = 16394}
+stacksize = 7000
+start = true
+task-slots = ["attest", "rng_driver"]
+
 [signing.certs]
 signing-certs = ["../../support/fake_certs/fake_certificate.der.crt"]
 root-certs = ["../../support/fake_certs/fake_certificate.der.crt"]

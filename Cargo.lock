@@ -4369,6 +4369,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "task-null"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "attest-api",
+ "build-util",
+ "drv-rng-api",
+ "rand_core",
+ "ringbuf",
+ "serde",
+ "sha3",
+ "userlib",
+]
+
+[[package]]
 name = "task-packrat"
 version = "0.1.0"
 dependencies = [
