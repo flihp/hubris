@@ -1,0 +1,17 @@
+// Interface to 'attest' task.
+
+Interface(
+    name: "Null",
+    ops: {
+        "null": (
+            doc: "Do nothing.",
+            encoding: Hubpack,
+            idempotent: true,
+            args: {},
+            reply: Result(
+                ok: "()",
+                err: Complex("NullError"),
+            ),
+        ),
+    }
+)

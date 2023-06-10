@@ -209,6 +209,13 @@ stacksize = 11264
 start = true
 extern-regions = ["dice_alias", "dice_certs"]
 
+[tasks.null_server]
+name = "task-null-server"
+priority = 6
+max-sizes = {flash = 8192, ram = 8192}
+stacksize = 7000
+start = true
+
 [signing.certs]
 signing-certs = ["../../support/fake_certs/fake_certificate.der.crt"]
 root-certs = ["../../support/fake_certs/fake_certificate.der.crt"]
