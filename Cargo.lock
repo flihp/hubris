@@ -2892,6 +2892,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "null-api"
+version = "0.1.0"
+dependencies = [
+ "hubpack",
+ "idol",
+ "num-traits",
+ "serde",
+ "userlib",
+]
+
+[[package]]
 name = "num"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4364,6 +4375,21 @@ dependencies = [
  "task-packrat-api",
  "userlib",
  "zerocopy",
+]
+
+[[package]]
+name = "task-null-server"
+version = "0.1.0"
+dependencies = [
+ "build-util",
+ "hubpack",
+ "idol",
+ "idol-runtime",
+ "null-api",
+ "num-traits",
+ "ringbuf",
+ "serde",
+ "userlib",
 ]
 
 [[package]]
