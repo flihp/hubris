@@ -11,7 +11,7 @@ fwid = true
 [kernel]
 name = "rot-carrier"
 features = ["dice-self"]
-requires = {flash = 53000, ram = 4096}
+requires = {flash = 53000, ram = 5120}
 
 [caboose]
 tasks = ["caboose_reader", "sprot"]
@@ -215,6 +215,14 @@ priority = 6
 max-sizes = {flash = 8192, ram = 8192}
 stacksize = 7000
 start = true
+
+[tasks.null_client]
+name = "task-null-client"
+priority = 7
+max-sizes = {flash = 8192, ram = 8192}
+stacksize = 7000
+start = true
+task-slots = ["null_server"]
 
 [signing.certs]
 signing-certs = ["../../support/fake_certs/fake_certificate.der.crt"]
