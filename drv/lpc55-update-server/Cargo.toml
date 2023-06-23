@@ -27,8 +27,10 @@ tlvc.workspace = true
 zerocopy.workspace = true
 
 [build-dependencies]
+anyhow.workspace = true
 build-util = { path = "../../build/util" }
 idol = { workspace = true }
+serde.workspace = true
 
 # This section is here to discourage RLS/rust-analyzer from doing test builds,
 # since test builds don't work for cross compilation.

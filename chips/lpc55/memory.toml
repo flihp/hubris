@@ -98,15 +98,6 @@ write = false
 execute = false
 dma = true
 
-[[usbsram]]
-name = "stage0"
-address = 0x40102000
-size = 0x1000
-read = true
-write = false
-execute = false
-dma = true
-
 # RAM region used to hand common part of DICE certificate chain forward to
 # Hubris tasks
 [[dice_certs]]

@@ -9,8 +9,10 @@
 #![no_std]
 #![no_main]
 
-use core::convert::Infallible;
-use core::mem::MaybeUninit;
+mod config;
+
+use config::DataRegion;
+use core::{slice, convert::Infallible};
 use drv_lpc55_flash::{BYTES_PER_FLASH_PAGE, BYTES_PER_FLASH_WORD};
 use drv_lpc55_update_api::{
     RawCabooseError, RotBootInfo, SlotId, SwitchDuration, UpdateTarget,
@@ -35,10 +37,6 @@ extern "C" {
 
     static __this_image: [u32; 0];
 }
-
-#[used]
-#[link_section = ".bootstate"]
-static BOOTSTATE: MaybeUninit<[u8; 0x1000]> = MaybeUninit::uninit();
 
 #[derive(PartialEq)]
 enum UpdateState {
@@ -225,8 +223,10 @@ impl idl::InOrderUpdateImpl for ServerImpl<'_> {
         _: &RecvMessage,
     ) -> Result<RotBootState, RequestError<HandoffDataLoadError>> {
         // Safety: Data is published by stage0
-        let addr = unsafe { BOOTSTATE.assume_init_ref() };
-        RotBootState::load_from_addr(addr).map_err(|e| e.into())
+        let data = unsafe {
+            slice::from_raw_parts(BOOTSTATE.address as *mut u8, BOOTSTATE.size as usize)
+        };
+        RotBootState::load_from_addr(data).map_err(|e| e.into())
     }
 
     fn rot_boot_info(
@@ -234,9 +234,12 @@ impl idl::InOrderUpdateImpl for ServerImpl<'_> {
         _: &RecvMessage,
     ) -> Result<RotBootInfo, RequestError<UpdateError>> {
         // Safety: Data is published by pre-kernel main
-        let addr = unsafe { BOOTSTATE.assume_init_ref() };
-        let boot_state = RotBootState::load_from_addr(addr)
+        let data = unsafe {
+            slice::from_raw_parts(BOOTSTATE.address as *mut u8, BOOTSTATE.size as usize)
+        };
+        let boot_state = RotBootState::load_from_addr(data)
             .map_err(|_| UpdateError::MissingHandoffData)?;
+
         let (
             persistent_boot_preference,
             pending_persistent_boot_preference,
