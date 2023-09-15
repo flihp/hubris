@@ -24,6 +24,8 @@ pub enum AttestError {
     BadLease,
     UnsupportedAlgorithm,
     SerializeLog,
+    SerializeSignature,
+    SignatureTooBig,
 }
 
 impl From<idol_runtime::ServerDeath> for AttestError {
