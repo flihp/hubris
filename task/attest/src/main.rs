@@ -12,15 +12,17 @@
 mod config;
 
 use attest_api::{AttestError, HashAlgorithm};
-use attest_data::{Log, Measurement, Sha3_256Digest};
+use attest_data::{Array, Attestation, Log, Measurement, Sha3_256Digest};
 use config::DataRegion;
 use core::slice;
 use hubpack::SerializedSize;
 use idol_runtime::{ClientError, Leased, RequestError, W};
-use lib_dice::{AliasData, CertData};
+use lib_dice::{AliasData, CertData, SeedBuf};
 use mutable_statics::mutable_statics;
 use ringbuf::{ringbuf, ringbuf_entry};
+use salty::signature::Keypair;
 use serde::Deserialize;
+use sha3::{Digest as CryptDigest, Sha3_256};
 use stage0_handoff::{HandoffData, HandoffDataLoadError};
 use zerocopy::AsBytes;
 
@@ -48,6 +50,8 @@ enum Trace {
     BadLease(usize),
     LogLen(u32),
     Log,
+    AttestLen(u32),
+    Attest,
     None,
 }
 
@@ -78,6 +82,7 @@ fn load_data_from_region<
 
 struct AttestServer {
     alias_data: Option<AliasData>,
+    alias_keypair: Option<Keypair>,
     buf: &'static mut [u8; Log::MAX_SIZE],
     cert_data: Option<CertData>,
     measurements: Log,
@@ -88,8 +93,16 @@ impl Default for AttestServer {
         let buf = mutable_statics! {
             static mut LOG_BUF: [u8; Log::MAX_SIZE] = [|| 0; _];
         };
+
+        let alias_data: Option<AliasData> = load_data_from_region(&ALIAS_DATA);
+        let alias_keypair = match alias_data {
+            Some(ref d) => Some(Keypair::from(d.alias_seed.as_bytes())),
+            None => None,
+        };
+
         Self {
-            alias_data: load_data_from_region(&ALIAS_DATA),
+            alias_data,
+            alias_keypair,
             buf,
             cert_data: load_data_from_region(&CERT_DATA),
             measurements: Log::default(),
@@ -98,6 +111,9 @@ impl Default for AttestServer {
 }
 
 impl AttestServer {
+    // size of nonce used to attest to the measurement log
+    const ATTEST_NONCE_SIZE: usize = 32;
+
     fn get_cert_bytes_from_index(
         &self,
         index: u32,
@@ -266,6 +282,57 @@ impl idl::InOrderAttestImpl for AttestServer {
 
         ringbuf_entry!(Trace::LogLen(len));
 
+        Ok(len)
+    }
+
+    fn attest(
+        &mut self,
+        _: &userlib::RecvMessage,
+        nonce: [u8; Self::ATTEST_NONCE_SIZE],
+        dest: Leased<W, [u8]>,
+    ) -> Result<(), RequestError<AttestError>> {
+        ringbuf_entry!(Trace::Attest);
+
+        let alias_keypair =
+            self.alias_keypair.as_ref().ok_or(AttestError::NoCerts)?;
+
+        let len = hubpack::serialize(self.buf, &self.measurements)
+            .map_err(|_| AttestError::SerializeLog)?;
+        let _ = u32::try_from(len).map_err(|_| AttestError::LogTooBig)?;
+
+        let mut hasher = Sha3_256::new();
+        hasher.update(&self.buf[..len]);
+
+        hasher.update(nonce);
+
+        let digest = hasher.finalize();
+        let signature = alias_keypair.sign(&digest);
+        let signature = Array::<64>(signature.to_bytes());
+        let attestation = Attestation::Ed25519(signature);
+
+        let len = hubpack::serialize(self.buf, &attestation)
+            .map_err(|_| AttestError::SerializeSignature)?;
+
+        if dest.len() != len {
+            let err = AttestError::BadLease;
+            ringbuf_entry!(Trace::AttestError(err));
+            return Err(err.into());
+        }
+
+        Ok(dest
+            .write_range(0..dest.len(), &self.buf[0..len])
+            .map_err(|_| RequestError::Fail(ClientError::WentAway))?)
+    }
+
+    fn attest_len(
+        &mut self,
+        _: &userlib::RecvMessage,
+    ) -> Result<u32, RequestError<AttestError>> {
+        // this may become inaccurate when additional variants are added to
+        // `enum Signature`
+        let len = u32::try_from(Attestation::MAX_SIZE).map_err(|_| AttestError::SignatureTooBig)?;
+
+        ringbuf_entry!(Trace::AttestLen(len));
         Ok(len)
     }
 }
