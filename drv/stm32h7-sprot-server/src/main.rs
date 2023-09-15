@@ -1009,6 +1009,14 @@ impl<S: SpiServer> idl::InOrderSpRotImpl for ServerImpl<S> {
             Err(e) => Err(AttestOrSprotError::Sprot(e).into()),
         }
     }
+
+    fn quote(
+        &mut self,
+        _: &userlib::RecvMessage,
+        data: idol_runtime::Leased<idol_runtime::W, [u8]>,
+    ) -> Result<(), idol_runtime::RequestError<AttestOrSprotError>> {
+        todo!("Attest::quote");
+    }
 }
 
 mod idl {

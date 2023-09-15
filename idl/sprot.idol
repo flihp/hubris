@@ -257,5 +257,16 @@ Interface(
             encoding: Hubpack,
             idempotent: true,
         ),
+        "quote": (
+            doc: "",
+            leases: {
+                "dest": (type: "[u8]", write: true),
+            },
+            reply: Result(
+                ok: "()",
+                err: Complex("AttestOrSprotError"),
+            ),
+            encoding: Hubpack,
+         ),
     }
 )
