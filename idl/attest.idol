@@ -79,7 +79,7 @@ Interface(
             idempotent: true,
         ),
         "quote": (
-            doc: "",
+            doc: "Get attestation of measurement log state",
             leases: {
                 "nonce": (type: "[u8]", read: true),
                 "dest": (type: "[u8]", write: true),
@@ -91,7 +91,7 @@ Interface(
             encoding: Hubpack,
         ),
         "quote_len": (
-            doc: "",
+            doc: "Get length of the attestations produced by this platform",
             reply: Result(
                 ok: "u32",
                 err: Complex("AttestError"),

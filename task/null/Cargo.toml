@@ -6,11 +6,15 @@ edition = "2021"
 [dependencies]
 attest-api.path = "../attest-api"
 drv-rng-api.path = "../../drv/rng-api"
+hubpack.workspace = true
+lib-dice.path = "../../lib/dice"
 rand_core.workspace = true
 ringbuf.path = "../../lib/ringbuf"
+salty.workspace = true
 serde.workspace = true
 sha3.workspace = true
 userlib = { path = "../../sys/userlib", features = ["panic-messages"] }
+zerocopy.workspace = true
 
 [build-dependencies]
 anyhow.workspace = true

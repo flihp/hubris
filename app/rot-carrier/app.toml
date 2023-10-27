@@ -14,7 +14,7 @@ features = ["dice-self"]
 requires = {flash = 53000, ram = 4096}
 
 [caboose]
-tasks = ["caboose_reader", "sprot"]
+tasks = ["caboose_reader"]
 region = "flash"
 size = 256
 default = true
@@ -29,6 +29,9 @@ notifications = ["fault", "timer"]
 
 [tasks.jefe.config.allowed-callers]
 request_reset = ["update_server"]
+
+[tasks.jefe.config]
+tasks-to-hold = ["null"]
 
 [tasks.caboose_reader]
 name = "task-caboose-reader"
@@ -105,34 +108,6 @@ start = true
 stacksize = 2200
 task-slots = ["syscon_driver"]
 
-[tasks.sprot]
-name = "drv-lpc55-sprot-server"
-priority = 6
-max-sizes = {flash = 46592, ram = 32768}
-uses = ["flexcomm8", "bootrom"]
-features = ["spi0"]
-start = true
-notifications = ["spi-irq"]
-interrupts = {"flexcomm8.hs_spi" = "spi-irq"}
-stacksize = 16384
-task-slots = ["gpio_driver", "syscon_driver", "update_server", "dumper", "attest"]
-
-[tasks.sprot.config]
-pins = [
-    # HS_SPI_MOSI = P0_26 = FUN9
-    { pin = { port = 0, pin = 26}, alt = 9},
-    # HS_SPI_MISO = P1_3 = FUN6
-    { pin = { port = 1, pin = 3}, alt = 6},
-    # HS_SPI_SCK = P1_2 = FUN6
-    { pin = { port = 1, pin = 2}, alt = 6},
-    # HS_SSEL1 = P1_1 = FUN5
-    { name = "CHIP_SELECT", pin = { port = 1, pin = 1}, alt = 5},
-    # ROT_IRQ = P0_18 = FUN0
-    { name = "ROT_IRQ", pin = { port = 0, pin = 18}, alt = 0, direction = "output"},
-    # SP_RESET = P0_9 = FUN0
-    { name = "SP_RESET", pin = { port = 0, pin = 9}, alt = 0, direction = "input"},
-]
-
 [tasks.swd]
 name = "drv-lpc55-swd"
 priority = 4
@@ -191,16 +166,6 @@ stacksize = 2048
 start = true
 task-slots = ["gpio_driver", "swd", "update_server"]
 
-[tasks.sp_measure]
-name = "task-sp-measure"
-priority = 6
-max-sizes = {flash = 131072, ram = 8192}
-task-slots = ["swd"]
-stacksize = 2048
-
-[tasks.sp_measure.config]
-binary_path = "../../target/gemini-bu/dist/final.bin"
-
 [tasks.attest]
 name = "task-attest"
 priority = 5
@@ -213,8 +178,8 @@ extern-regions = ["dice_alias", "dice_certs"]
 [tasks.null]
 name = "task-null"
 priority = 6
-max-sizes = {flash = 12000, ram = 16394}
-stacksize = 7000
+max-sizes = {flash = 37000, ram = 16394}
+stacksize = 10000
 start = true
 task-slots = ["attest", "rng_driver"]
 

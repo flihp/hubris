@@ -11,10 +11,12 @@
 
 mod config;
 
-use attest_api::{AttestError, HashAlgorithm};
+use attest_api::{
+    AttestError, Digest, HashAlgorithm, Sha3_256Digest, Signature,
+    SHA3_256_DIGEST_SIZE,
+};
 use config::DataRegion;
 use core::slice;
-use crypto_common::{typenum::Unsigned, OutputSizeUser};
 use hubpack::SerializedSize;
 use idol_runtime::{ClientError, Leased, RequestError, R, W};
 use lib_dice::{AliasData, CertData, SeedBuf};
@@ -23,8 +25,7 @@ use ringbuf::{ringbuf, ringbuf_entry};
 use salty::signature::Keypair;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use sha2::Sha512VarCore;
-use sha3::{Digest as CryptDigest, Sha3_256, Sha3_256Core};
+use sha3::{Digest as CryptDigest, Sha3_256};
 use stage0_handoff::{HandoffData, HandoffDataLoadError};
 use zerocopy::AsBytes;
 
@@ -82,30 +83,8 @@ fn load_data_from_region<
     }
 }
 
-// the size of an ed25519 signature
-const SHA_512_DIGEST_SIZE: usize =
-    <Sha512VarCore as OutputSizeUser>::OutputSize::USIZE;
-
-// the size of the measurements we record
-const SHA3_256_DIGEST_SIZE: usize =
-    <Sha3_256Core as OutputSizeUser>::OutputSize::USIZE;
-
 // the number of Measurements we can record
 const CAPACITY: usize = 16;
-
-// Digest is a fixed length array of bytes
-#[serde_as]
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, SerializedSize)]
-struct Digest<const N: usize>(#[serde_as(as = "[_; N]")] [u8; N]);
-
-impl<const N: usize> Default for Digest<N> {
-    fn default() -> Self {
-        Digest([0u8; N])
-    }
-}
-
-type Sha512Digest = Digest<SHA_512_DIGEST_SIZE>;
-type Sha3_256Digest = Digest<SHA3_256_DIGEST_SIZE>;
 
 // Measurement is an enum that can hold any of the supported hash algorithms
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, SerializedSize)]
@@ -174,11 +153,6 @@ impl<const N: usize> Default for Log<N> {
             measurements: [Measurement::default(); N],
         }
     }
-}
-
-#[derive(Serialize, SerializedSize)]
-enum Signature {
-    Ed25519(Sha512Digest),
 }
 
 struct AttestServer {
@@ -412,6 +386,7 @@ impl idl::InOrderAttestImpl for AttestServer {
         nonce_src
             .read_range(0..32, &mut nonce[..])
             .map_err(|_| RequestError::Fail(ClientError::WentAway))?;
+        let nonce = nonce;
         hasher.update(nonce);
 
         let digest = hasher.finalize();

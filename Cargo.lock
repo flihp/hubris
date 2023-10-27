@@ -91,6 +91,9 @@ dependencies = [
  "idol-runtime",
  "num-traits",
  "serde",
+ "serde_with 3.3.0",
+ "sha2",
+ "sha3",
  "userlib",
  "zerocopy",
 ]
@@ -3986,7 +3989,6 @@ dependencies = [
  "arrayvec",
  "attest-api",
  "build-util",
- "crypto-common",
  "hubpack",
  "idol",
  "idol-runtime",
@@ -3997,7 +3999,6 @@ dependencies = [
  "salty",
  "serde",
  "serde_with 3.3.0",
- "sha2",
  "sha3",
  "stage0-handoff",
  "unwrap-lite",
@@ -4376,11 +4377,15 @@ dependencies = [
  "attest-api",
  "build-util",
  "drv-rng-api",
+ "hubpack",
+ "lib-dice",
  "rand_core",
  "ringbuf",
+ "salty",
  "serde",
  "sha3",
  "userlib",
+ "zerocopy",
 ]
 
 [[package]]
