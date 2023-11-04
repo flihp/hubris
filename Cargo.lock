@@ -2900,6 +2900,7 @@ dependencies = [
  "num-traits",
  "serde",
  "userlib",
+ "zerocopy",
 ]
 
 [[package]]
@@ -4402,6 +4403,7 @@ dependencies = [
  "ringbuf",
  "serde",
  "userlib",
+ "zerocopy",
 ]
 
 [[package]]

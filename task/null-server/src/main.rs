@@ -5,11 +5,12 @@
 #![no_std]
 #![no_main]
 
-use null_api::NullError;
+use null_api::{NullError, NullErrorZ};
 use ringbuf::{ringbuf, ringbuf_entry};
 
 #[derive(Copy, Clone, PartialEq)]
 enum Trace {
+    ArrayIn([u8; 2]),
     None,
     Null,
     Start,
@@ -34,6 +35,16 @@ impl idl::InOrderNullImpl for NullServer {
 
         Ok(())
     }
+
+    fn array_in(
+        &mut self,
+        _msg: &userlib::RecvMessage,
+        array: [u8; 2],
+    ) -> Result<(), idol_runtime::RequestError<NullErrorZ>> {
+        ringbuf_entry!(Trace::ArrayIn(array));
+
+        Ok(())
+    }
 }
 
 #[export_name = "main"]
@@ -49,7 +60,7 @@ fn main() {
 }
 
 mod idl {
-    use super::NullError;
+    use super::{NullError, NullErrorZ};
 
     include!(concat!(env!("OUT_DIR"), "/server_stub.rs"));
 }

@@ -5,12 +5,15 @@ edition = "2021"
 
 [dependencies]
 idol-runtime.workspace = true
+# required to build the generated server_stub.rs for hubpack encoded operations
 hubpack.workspace = true
 null-api.path = "../../lib/null-api"
 num-traits.workspace = true
 ringbuf.path = "../../lib/ringbuf"
 serde.workspace = true
 userlib = { path = "../../sys/userlib", features = ["panic-messages"] }
+# required to build the generated server_stub.rs for zerocopy encoded operations
+zerocopy.workspace = true
 
 [build-dependencies]
 idol.workspace = true

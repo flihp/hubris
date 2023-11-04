@@ -11,6 +11,7 @@ use userlib::{task_slot, TaskId};
 
 #[derive(Copy, Clone, PartialEq)]
 enum Trace {
+    CallingArrayIn([u8; 2]),
     CallingNull,
     None,
     Start,
@@ -29,6 +30,11 @@ fn main() {
 
     ringbuf_entry!(Trace::CallingNull);
     null.null().unwrap();
+    ringbuf_entry!(Trace::Success);
+
+    let array = [0xbe, 0xef];
+    ringbuf_entry!(Trace::CallingArrayIn(array));
+    null.array_in(array).unwrap();
     ringbuf_entry!(Trace::Success);
 
     if userlib::sys_recv_closed(&mut [], 1, TaskId::KERNEL).is_err() {

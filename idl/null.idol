@@ -13,5 +13,21 @@ Interface(
                 err: Complex("NullError"),
             ),
         ),
+        "array_in": (
+            doc: "pass an array to me as an argument",
+            // the encoding is significant: humility can only pass array
+            // parameters over hiffy when encoding with Zerocopy
+            encoding: Zerocopy,
+            idempotent: true,
+            args: {
+                "array": "[u8; 2]"
+            },
+            reply: Result(
+                ok: "()",
+                // the Zerocopy encoding cannot be used with
+                // idol::syntac::Error::Complex so we use 'CLike'
+                err: CLike("NullErrorZ"),
+            ),
+        ),
     }
 )

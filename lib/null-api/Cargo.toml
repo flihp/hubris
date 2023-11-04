@@ -4,10 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# required when using idol Hubpack encoding
 hubpack.workspace = true
 num-traits.workspace = true
 serde.workspace = true
 userlib = {  path = "../../sys/userlib", features = ["panic-messages"]  }
+# required when using idol Zerocopy encoding
+zerocopy.workspace = true
 
 [build-dependencies]
 idol.workspace = true
