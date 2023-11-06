@@ -130,7 +130,7 @@ static HIFFY_VERSION_PATCH: AtomicU32 = AtomicU32::new(HIF_VERSION_PATCH);
 fn main() -> ! {
     let mut sleep_ms = 250;
     let mut sleeps = 0;
-    let mut stack = [None; 32];
+    let mut stack = [None; 38];
     const NLABELS: usize = 4;
 
     //
