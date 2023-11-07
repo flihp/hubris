@@ -13,20 +13,94 @@ Interface(
                 err: Complex("NullError"),
             ),
         ),
-        "array_in": (
+        "array_in_zerocopy": (
             doc: "pass an array to me as an argument",
             // the encoding is significant: humility can only pass array
             // parameters over hiffy when encoding with Zerocopy
             encoding: Zerocopy,
             idempotent: true,
             args: {
-                "array": "[u8; 2]"
+                "array": "[u8; 4]"
             },
             reply: Result(
                 ok: "()",
                 // the Zerocopy encoding cannot be used with
                 // idol::syntac::Error::Complex so we use 'CLike'
                 err: CLike("NullErrorZ"),
+            ),
+        ),
+        "array_in_hubpack": (
+            doc: "pass an array to me as an argument",
+            // the encoding is significant: humility cannot yet pass arrays
+            // to operations that use the hubpack encoding
+            encoding: Hubpack,
+            idempotent: true,
+            args: {
+                "array": "[u8; 4]"
+            },
+            reply: Result(
+                ok: "()",
+                err: Complex("NullError"),
+            ),
+        ),
+        "array_in_hubpack_16": (
+            doc: "pass an array to me as an argument",
+            encoding: Hubpack,
+            idempotent: true,
+            args: {
+                "array": "[u8; 16]"
+            },
+            reply: Result(
+                ok: "()",
+                err: Complex("NullError"),
+            ),
+        ),
+        "array_in_hubpack_24": (
+            doc: "pass an array to me as an argument",
+            encoding: Hubpack,
+            idempotent: true,
+            args: {
+                "array": "[u8; 24]"
+            },
+            reply: Result(
+                ok: "()",
+                err: Complex("NullError"),
+            ),
+        ),
+        "array_in_hubpack_28": (
+            doc: "pass an array to me as an argument",
+            encoding: Hubpack,
+            idempotent: true,
+            args: {
+                "array": "[u8; 28]"
+            },
+            reply: Result(
+                ok: "()",
+                err: Complex("NullError"),
+            ),
+        ),
+        "array_in_hubpack_30": (
+            doc: "pass an array to me as an argument",
+            encoding: Hubpack,
+            idempotent: true,
+            args: {
+                "array": "[u8; 30]"
+            },
+            reply: Result(
+                ok: "()",
+                err: Complex("NullError"),
+            ),
+        ),
+        "array_in_hubpack_32": (
+            doc: "pass an array to me as an argument",
+            encoding: Hubpack,
+            idempotent: true,
+            args: {
+                "array": "[u8; 32]"
+            },
+            reply: Result(
+                ok: "()",
+                err: Complex("NullError"),
             ),
         ),
     }

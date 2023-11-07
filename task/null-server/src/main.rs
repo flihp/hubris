@@ -8,9 +8,17 @@
 use null_api::{NullError, NullErrorZ};
 use ringbuf::{ringbuf, ringbuf_entry};
 
+const ARRAY_LENGTH: usize = 4;
+
 #[derive(Copy, Clone, PartialEq)]
 enum Trace {
-    ArrayIn([u8; 2]),
+    ArrayInZerocopy([u8; ARRAY_LENGTH]),
+    ArrayInHubpack([u8; ARRAY_LENGTH]),
+    ArrayInHubpack16([u8; 16]),
+    ArrayInHubpack24([u8; 24]),
+    ArrayInHubpack28([u8; 28]),
+    ArrayInHubpack30([u8; 30]),
+    ArrayInHubpack32([u8; 32]),
     None,
     Null,
     Start,
@@ -36,12 +44,71 @@ impl idl::InOrderNullImpl for NullServer {
         Ok(())
     }
 
-    fn array_in(
+    fn array_in_zerocopy(
         &mut self,
         _msg: &userlib::RecvMessage,
-        array: [u8; 2],
+        array: [u8; ARRAY_LENGTH],
     ) -> Result<(), idol_runtime::RequestError<NullErrorZ>> {
-        ringbuf_entry!(Trace::ArrayIn(array));
+        ringbuf_entry!(Trace::ArrayInZerocopy(array));
+
+        Ok(())
+    }
+
+    fn array_in_hubpack(
+        &mut self,
+        _msg: &userlib::RecvMessage,
+        array: [u8; ARRAY_LENGTH],
+    ) -> Result<(), idol_runtime::RequestError<NullError>> {
+        ringbuf_entry!(Trace::ArrayInHubpack(array));
+
+        Ok(())
+    }
+
+    fn array_in_hubpack_16(
+        &mut self,
+        _msg: &userlib::RecvMessage,
+        array: [u8; 16],
+    ) -> Result<(), idol_runtime::RequestError<NullError>> {
+        ringbuf_entry!(Trace::ArrayInHubpack16(array));
+
+        Ok(())
+    }
+
+    fn array_in_hubpack_24(
+        &mut self,
+        _msg: &userlib::RecvMessage,
+        array: [u8; 24],
+    ) -> Result<(), idol_runtime::RequestError<NullError>> {
+        ringbuf_entry!(Trace::ArrayInHubpack24(array));
+
+        Ok(())
+    }
+
+    fn array_in_hubpack_28(
+        &mut self,
+        _msg: &userlib::RecvMessage,
+        array: [u8; 28],
+    ) -> Result<(), idol_runtime::RequestError<NullError>> {
+        ringbuf_entry!(Trace::ArrayInHubpack28(array));
+
+        Ok(())
+    }
+
+    fn array_in_hubpack_30(
+        &mut self,
+        _msg: &userlib::RecvMessage,
+        array: [u8; 30],
+    ) -> Result<(), idol_runtime::RequestError<NullError>> {
+        ringbuf_entry!(Trace::ArrayInHubpack30(array));
+
+        Ok(())
+    }
+    fn array_in_hubpack_32(
+        &mut self,
+        _msg: &userlib::RecvMessage,
+        array: [u8; 32],
+    ) -> Result<(), idol_runtime::RequestError<NullError>> {
+        ringbuf_entry!(Trace::ArrayInHubpack32(array));
 
         Ok(())
     }

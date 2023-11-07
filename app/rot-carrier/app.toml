@@ -186,20 +186,10 @@ notifications = ["timer"]
 name = "task-hiffy"
 priority = 6
 features = ["lpc55", "gpio", "spctrl", "spi"]
-max-sizes = {flash = 32768, ram = 16384 }
+max-sizes = {flash = 32768, ram = 32768 }
 stacksize = 2048
 start = true
 task-slots = ["gpio_driver", "swd", "update_server"]
-
-[tasks.sp_measure]
-name = "task-sp-measure"
-priority = 6
-max-sizes = {flash = 131072, ram = 8192}
-task-slots = ["swd"]
-stacksize = 2048
-
-[tasks.sp_measure.config]
-binary_path = "../../target/gemini-bu/dist/final.bin"
 
 [tasks.attest]
 name = "task-attest"
@@ -212,17 +202,9 @@ extern-regions = ["dice_alias", "dice_certs"]
 [tasks.null_server]
 name = "task-null-server"
 priority = 6
-max-sizes = {flash = 8192, ram = 8192}
+max-sizes = {flash = 16384, ram = 8192}
 stacksize = 7000
 start = true
-
-[tasks.null_client]
-name = "task-null-client"
-priority = 7
-max-sizes = {flash = 8192, ram = 8192}
-stacksize = 7000
-start = true
-task-slots = ["null_server"]
 
 [signing.certs]
 signing-certs = ["../../support/fake_certs/fake_certificate.der.crt"]
