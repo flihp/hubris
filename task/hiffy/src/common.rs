@@ -419,6 +419,29 @@ pub(crate) fn send_lease_write(
     Ok(nreply + nlease)
 }
 
+///
+/// Function to send an arbitrary message to an arbitrary task with one read
+/// and one write lease. The read lease / input is passed as `data`. The write
+/// lease is attached to the tail end of `rval` (shared with reply bytes).
+///
+/// arg2+n+3: Size of read lease?
+/// arg2+n+2: Size of write lease?
+/// arg2+n+1: Number of reply bytes
+/// arg2+n: Number of bytes
+/// arg2: Argument bytes
+/// arg1: Operation
+/// arg0: Task
+///
+#[allow(dead_code)]
+pub(crate) fn send_lease_read_write(
+    stack: &[Option<u32>],
+    data: &[u8],
+    rval: &mut [u8],
+) -> Result<usize, Failure> {
+    // Integrate this into the function table like `send_lease_read` etc.
+    todo!("send_lease_read_write");
+}
+
 #[cfg(feature = "spi")]
 fn spi_args(stack: &[Option<u32>]) -> Result<(TaskId, u8, usize), Failure> {
     if stack.len() < 3 {
