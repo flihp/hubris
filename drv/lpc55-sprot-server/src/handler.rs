@@ -307,6 +307,13 @@ impl Handler {
                 let boot_info = self.update.rot_boot_info()?;
                 Ok((RspBody::Update(boot_info.into()), None))
             }
+            ReqBody::Attest(AttestReq::AttestLen) => {
+                let rsp = match self.attest.attest_len() {
+                    Ok(v) => Ok(AttestRsp::AttestLen(v)),
+                    Err(e) => Err(e),
+                };
+                Ok((RspBody::Attest(rsp), None))
+            }
             ReqBody::Attest(AttestReq::Cert {
                 index,
                 offset,

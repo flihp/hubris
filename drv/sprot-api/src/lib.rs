@@ -381,6 +381,7 @@ pub enum CabooseReq {
 
 #[derive(Clone, Serialize, Deserialize, SerializedSize)]
 pub enum AttestReq {
+    AttestLen,
     CertChainLen,
     CertLen(u32),
     Cert { index: u32, offset: u32, size: u32 },
@@ -408,6 +409,7 @@ pub enum CabooseRsp {
 
 #[derive(Clone, Serialize, Deserialize, SerializedSize)]
 pub enum AttestRsp {
+    AttestLen(u32),
     CertChainLen(u32),
     CertLen(u32),
     Cert,
