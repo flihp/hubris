@@ -47,6 +47,7 @@ pub enum TrailingData {
     Caboose { slot: SlotId, start: u32, size: u32 },
     AttestCert { index: u32, offset: u32, size: u32 },
     AttestLog { offset: u32, size: u32 },
+    Attestation { nonce: [u8; 32], size: u32 },
     RotPage { page: RotPage },
 }
 
@@ -130,6 +131,27 @@ impl Handler {
                             )
                             .map_err(|e| RspBody::Caboose(Err(e)))?;
                         Ok(blob_size)
+                    }) {
+                        Ok(size) => size,
+                        Err(e) => Response::pack(&Ok(e), tx_buf),
+                    }
+                }
+            }
+            Some(TrailingData::Attestation { nonce, size }) => {
+                let size: usize = usize::try_from(size).unwrap_lite();
+                if size > drv_sprot_api::MAX_BLOB_SIZE {
+                    Response::pack(
+                        &Err(SprotError::Protocol(
+                            SprotProtocolError::BadMessageLength,
+                        )),
+                        tx_buf,
+                    )
+                } else {
+                    match Response::pack_with_cb(&rsp_body, tx_buf, |buf| {
+                        self.attest
+                            .attest(nonce,&mut buf[..size])
+                            .map_err(|e| RspBody::Attest(Err(e)))?;
+                        Ok(size)
                     }) {
                         Ok(size) => size,
                         Err(e) => Response::pack(&Ok(e), tx_buf),
@@ -306,6 +328,12 @@ impl Handler {
             ReqBody::Update(UpdateReq::BootInfo) => {
                 let boot_info = self.update.rot_boot_info()?;
                 Ok((RspBody::Update(boot_info.into()), None))
+            }
+            ReqBody::Attest(AttestReq::Attest { nonce, size }) => {
+                Ok((
+                    RspBody::Attest(Ok(AttestRsp::Attest)),
+                    Some(TrailingData::Attestation { nonce, size }),
+                ))
             }
             ReqBody::Attest(AttestReq::AttestLen) => {
                 let rsp = match self.attest.attest_len() {

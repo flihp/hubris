@@ -266,5 +266,19 @@ Interface(
             encoding: Hubpack,
             idempotent: true,
         ),
+        "attest": (
+            doc: "Get an attestation",
+            args: {
+                "nonce" : "[u8; 32]",
+            },
+            leases: {
+                "dest": (type: "[u8]", write: true),
+            },
+            reply: Result(
+                ok: "()",
+                err: Complex("AttestOrSprotError"),
+            ),
+            encoding: Hubpack,
+        ),
     }
 )
