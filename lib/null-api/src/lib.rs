@@ -11,6 +11,8 @@
 )]
 pub enum NullError {
     SomethingBad,
+    LeasesNotEqual,
+    LeaseTooBig,
 }
 
 use hubpack::SerializedSize;

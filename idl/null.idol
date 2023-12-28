@@ -13,5 +13,45 @@ Interface(
                 err: Complex("NullError"),
             ),
         ),
+        "input": (
+            doc: "take an input / read lease",
+            encoding: Hubpack,
+            idempotent: true,
+            args: {},
+            leases: {
+                "src": (type: "[u8]", read: true),
+            },
+            reply: Result(
+                ok: "()",
+                err: Complex("NullError"),
+            ),
+        ),
+        "input_output": (
+            doc: "take an input / read and output / write lease",
+            encoding: Hubpack,
+            idempotent: true,
+            args: {},
+            leases: {
+                "src": (type: "[u8]", read: true),
+                "dst": (type: "[u8]", write: true),
+            },
+            reply: Result(
+                ok: "()",
+                err: Complex("NullError"),
+            ),
+        ),
+        "output": (
+            doc: "take an output / write lease",
+            encoding: Hubpack,
+            idempotent: true,
+            args: {},
+            leases: {
+                "dst": (type: "[u8]", write: true),
+            },
+            reply: Result(
+                ok: "()",
+                err: Complex("NullError"),
+            ),
+        ),
     }
 )
