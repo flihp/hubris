@@ -314,8 +314,10 @@ pub(crate) fn send_lease_write(
         return Err(Failure::Fault(Fault::MissingParameters));
     }
 
+    // set stack pointer (sp) to top of stack
     let sp = stack.len();
 
+    // size of the lease is on the top of the stack
     let nlease = match stack[sp - 1] {
         Some(nlease) => nlease as usize,
         None => {
@@ -323,6 +325,7 @@ pub(crate) fn send_lease_write(
         }
     };
 
+    // size of the reply (rval?)
     let nreply = match stack[sp - 2] {
         Some(nreply) => nreply as usize,
         None => {
@@ -330,10 +333,13 @@ pub(crate) fn send_lease_write(
         }
     };
 
+    // ensure `rval` is sufficiently large to hold the reply and the output
+    // lease
     if nreply + nlease > rval.len() {
         return Err(Failure::Fault(Fault::ReturnStackOverflow));
     }
 
+    // number of bytes in ... something, the area holding parameters to the op?
     let nbytes = match stack[sp - 3] {
         Some(nbytes) => nbytes as usize,
         None => {
@@ -341,12 +347,17 @@ pub(crate) fn send_lease_write(
         }
     };
 
+    // if the stack length is < nbytes + 5 the stack has underflowed ...
+    // but why 5? we've only pulled 3 bytes off the stack
+    // this is an underflow because the stack
     if stack.len() < nbytes + 5 {
         return Err(Failure::Fault(Fault::StackUnderflow));
     }
 
+    // we set the FP to wherever the nbytes + 5 offset is
     let fp = sp - (nbytes + 5);
 
+    // the id of the task we're calling into
     let task = match stack[fp + 0] {
         Some(task) => {
             if task >= NUM_TASKS as u32 {
@@ -363,6 +374,7 @@ pub(crate) fn send_lease_write(
         }
     };
 
+    // the id of the operation we're calling in the task
     let op = match stack[fp + 1] {
         Some(op) => {
             if op > core::u16::MAX.into() {
@@ -446,6 +458,7 @@ pub(crate) fn send_lease_read_write(
 
     let sp = stack.len();
 
+    // stack[sp - 1] is size of output lease
     let nlease_out = match stack[sp - 1] {
         Some(nlease) => nlease as usize,
         None => {
