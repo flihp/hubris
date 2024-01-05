@@ -419,6 +419,153 @@ pub(crate) fn send_lease_write(
     Ok(nreply + nlease)
 }
 
+///
+/// Function to send an arbitrary message to an arbitrary task with a single
+/// read lease and a single write lease attached to the tail end of `rval`
+/// (shared with reply bytes)
+///
+/// arg2+n+3: Size of write lease
+/// arg2+n+2: Size of read lease
+/// arg2+n+1: Number of reply bytes
+/// arg2+n: Number of bytes
+/// arg2: Argument bytes
+/// arg1: Operation
+/// arg0: Task
+///
+#[allow(dead_code)]
+pub(crate) fn send_lease_read_write(
+    stack: &[Option<u32>],
+    data: &[u8],
+    rval: &mut [u8],
+) -> Result<usize, Failure> {
+    let mut payload = [0u8; 32];
+
+    if stack.len() < 6 {
+        return Err(Failure::Fault(Fault::MissingParameters));
+    }
+
+    let sp = stack.len();
+
+    let nlease_out = match stack[sp - 1] {
+        Some(nlease) => nlease as usize,
+        None => {
+            return Err(Failure::Fault(Fault::EmptyParameter(6)));
+        }
+    };
+
+    if nlease_out > data.len() {
+        return Err(Failure::Fault(Fault::BadParameter(6)));
+    }
+
+    let nlease_in = match stack[sp - 2] {
+        Some(nlease) => nlease as usize,
+        None => {
+            return Err(Failure::Fault(Fault::EmptyParameter(5)));
+        }
+    };
+    if nlease_in > data.len() {
+        return Err(Failure::Fault(Fault::BadParameter(5)));
+    }
+
+    let nreply = match stack[sp - 3] {
+        Some(nreply) => nreply as usize,
+        None => {
+            return Err(Failure::Fault(Fault::EmptyParameter(4)));
+        }
+    };
+
+    if nreply + nlease_out > rval.len() {
+        return Err(Failure::Fault(Fault::ReturnStackOverflow));
+    }
+
+    let nbytes = match stack[sp - 4] {
+        Some(nbytes) => nbytes as usize,
+        None => {
+            return Err(Failure::Fault(Fault::EmptyParameter(3)));
+        }
+    };
+
+    if stack.len() < nbytes + 6 {
+        return Err(Failure::Fault(Fault::StackUnderflow));
+    }
+
+    let fp = sp - (nbytes + 6);
+
+    let task = match stack[fp + 0] {
+        Some(task) => {
+            if task >= NUM_TASKS as u32 {
+                return Err(Failure::Fault(Fault::BadParameter(0)));
+            }
+
+            let prototype =
+                TaskId::for_index_and_gen(task as usize, Generation::default());
+
+            sys_refresh_task_id(prototype)
+        }
+        None => {
+            return Err(Failure::Fault(Fault::EmptyParameter(0)));
+        }
+    };
+
+    let op = match stack[fp + 1] {
+        Some(op) => {
+            if op > core::u16::MAX.into() {
+                return Err(Failure::Fault(Fault::BadParameter(1)));
+            }
+
+            op as u16
+        }
+        None => {
+            return Err(Failure::Fault(Fault::EmptyParameter(1)));
+        }
+    };
+
+    //
+    // Time to assemble the actual bytes of our payload.
+    //
+    if nbytes > payload.len() {
+        return Err(Failure::Fault(Fault::StackUnderflow));
+    }
+
+    let base = fp + 2;
+
+    for i in base..base + nbytes {
+        payload[i - base] = match stack[i] {
+            Some(byte) => {
+                if byte > core::u8::MAX.into() {
+                    return Err(Failure::Fault(Fault::BadParameter(2)));
+                }
+
+                byte as u8
+            }
+            None => {
+                return Err(Failure::Fault(Fault::EmptyParameter(2)));
+            }
+        };
+    }
+
+    //
+    // We have it all! Time to send.
+    //
+    let (rval, lease) = rval.split_at_mut(nreply);
+    let (code, _) = sys_send(
+        task,
+        op,
+        &payload[0..nbytes],
+        &mut rval[0..nreply],
+        &[
+            userlib::Lease::read_only(&data[..nlease_in]),
+            userlib::Lease::write_only(&mut lease[..nlease_out]),
+        ],
+    );
+
+    if code != 0 {
+        return Err(Failure::FunctionError(code));
+    }
+
+    Ok(nreply + nlease_out)
+}
+
 #[cfg(feature = "spi")]
 fn spi_args(stack: &[Option<u32>]) -> Result<(TaskId, u8, usize), Failure> {
     if stack.len() < 3 {
