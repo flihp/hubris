@@ -1009,6 +1009,76 @@ impl<S: SpiServer> idl::InOrderSpRotImpl for ServerImpl<S> {
             Err(e) => Err(AttestOrSprotError::Sprot(e).into()),
         }
     }
+
+    fn attest(
+        &mut self,
+        _msg: &userlib::RecvMessage,
+        nonce: idol_runtime::LenLimit<
+            idol_runtime::Leased<idol_runtime::R, [u8]>,
+            MAX_BLOB_SIZE,
+        >,
+        dest: idol_runtime::Leased<idol_runtime::W, [u8]>,
+    ) -> Result<(), idol_runtime::RequestError<AttestOrSprotError>>
+    where
+        AttestOrSprotError: From<idol_runtime::ServerDeath>,
+    {
+        let nonce_size = u32::try_from(nonce.len()).unwrap_lite();
+        let write_size = u32::try_from(dest.len()).unwrap_lite();
+
+        let body = ReqBody::Attest(AttestReq::Attest {
+            nonce_size,
+            write_size,
+        });
+        let tx_size = Request::pack_with_blob(&body, self.tx_buf, nonce)?;
+
+        let rsp = self.do_send_recv_retries(tx_size, TIMEOUT_MEDIUM, 1)?;
+
+        match rsp.body {
+            Ok(RspBody::Attest(Ok(AttestRsp::Attest))) => {
+                // Copy response data into the lease
+                if rsp.blob.len() < dest.len() {
+                    return Err(idol_runtime::RequestError::Fail(
+                        idol_runtime::ClientError::BadLease,
+                    ));
+                }
+                dest.write_range(0..dest.len(), &rsp.blob[..dest.len()])
+                    .map_err(|()| {
+                        idol_runtime::RequestError::Fail(
+                            idol_runtime::ClientError::WentAway,
+                        )
+                    })?;
+                Ok(())
+            }
+            Ok(RspBody::Attest(Err(e))) => {
+                Err(AttestOrSprotError::Attest(e).into())
+            }
+            Ok(RspBody::Attest(_)) | Ok(_) => Err(AttestOrSprotError::Sprot(
+                SprotError::Protocol(SprotProtocolError::UnexpectedResponse),
+            )
+            .into()),
+            Err(e) => Err(AttestOrSprotError::Sprot(e).into()),
+        }
+    }
+
+    fn attest_len(
+        &mut self,
+        _msg: &userlib::RecvMessage,
+    ) -> Result<u32, idol_runtime::RequestError<AttestOrSprotError>> {
+        let body = ReqBody::Attest(AttestReq::AttestLen);
+        let tx_size = Request::pack(&body, self.tx_buf);
+        let rsp = self.do_send_recv_retries(tx_size, TIMEOUT_QUICK, 1)?;
+        match rsp.body {
+            Ok(RspBody::Attest(Ok(AttestRsp::AttestLen(s)))) => Ok(s),
+            Ok(RspBody::Attest(Err(e))) => {
+                Err(AttestOrSprotError::Attest(e).into())
+            }
+            Ok(RspBody::Attest(_)) | Ok(_) => Err(AttestOrSprotError::Sprot(
+                SprotError::Protocol(SprotProtocolError::UnexpectedResponse),
+            )
+            .into()),
+            Err(e) => Err(AttestOrSprotError::Sprot(e).into()),
+        }
+    }
 }
 
 mod idl {
