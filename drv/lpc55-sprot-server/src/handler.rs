@@ -47,6 +47,7 @@ pub enum TrailingData {
     Caboose { slot: SlotId, start: u32, size: u32 },
     AttestCert { index: u32, offset: u32, size: u32 },
     AttestLog { offset: u32, size: u32 },
+    Attest { read_size: u32, write_size: u32 },
     RotPage { page: RotPage },
 }
 
@@ -197,6 +198,9 @@ impl Handler {
                         Err(e) => Response::pack(&Ok(e), tx_buf),
                     }
                 }
+            }
+            Some(TrailingData::Attest { .. }) => {
+                todo!("TrailingData::Attest");
             }
             _ => Response::pack(&rsp_body, tx_buf),
         }
@@ -363,6 +367,17 @@ impl Handler {
             ReqBody::Attest(AttestReq::LogLen) => {
                 let rsp = match self.attest.log_len() {
                     Ok(l) => Ok(AttestRsp::LogLen(l)),
+                    Err(e) => Err(e),
+                };
+                Ok((RspBody::Attest(rsp), None))
+            }
+            ReqBody::Attest(AttestReq::Attest { read_size, write_size }) => Ok((
+                RspBody::Attest(Ok(AttestRsp::Attest)),
+                Some(TrailingData::Attest { read_size, write_size}),
+            )),
+            ReqBody::Attest(AttestReq::AttestLen) => {
+                let rsp = match self.attest.attest_len() {
+                    Ok(l) => Ok(AttestRsp::AttestLen(l)),
                     Err(e) => Err(e),
                 };
                 Ok((RspBody::Attest(rsp), None))

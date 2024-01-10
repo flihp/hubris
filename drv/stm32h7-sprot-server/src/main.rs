@@ -1009,6 +1009,35 @@ impl<S: SpiServer> idl::InOrderSpRotImpl for ServerImpl<S> {
             Err(e) => Err(AttestOrSprotError::Sprot(e).into()),
         }
     }
+
+    fn attest(
+        &mut self,
+        msg: &userlib::RecvMessage,
+        nonce: idol_runtime::Leased<idol_runtime::R, [u8]>,
+        dest: idol_runtime::Leased<idol_runtime::W, [u8]>,
+    ) -> Result<(), idol_runtime::RequestError<AttestOrSprotError>> where AttestOrSprotError: From<idol_runtime::ServerDeath> {
+        todo!("attest");
+    }
+
+    fn attest_len(
+        &mut self,
+        msg: &userlib::RecvMessage,
+    ) -> Result<u32, idol_runtime::RequestError<AttestOrSprotError>> {
+        let body = ReqBody::Attest(AttestReq::AttestLen);
+        let tx_size = Request::pack(&body, self.tx_buf);
+        let rsp = self.do_send_recv_retries(tx_size, TIMEOUT_QUICK, 1)?;
+        match rsp.body {
+            Ok(RspBody::Attest(Ok(AttestRsp::AttestLen(s)))) => Ok(s),
+            Ok(RspBody::Attest(Err(e))) => {
+                Err(AttestOrSprotError::Attest(e).into())
+            }
+            Ok(RspBody::Attest(_)) | Ok(_) => Err(AttestOrSprotError::Sprot(
+                SprotError::Protocol(SprotProtocolError::UnexpectedResponse),
+            )
+            .into()),
+            Err(e) => Err(AttestOrSprotError::Sprot(e).into()),
+        }
+    }
 }
 
 mod idl {
