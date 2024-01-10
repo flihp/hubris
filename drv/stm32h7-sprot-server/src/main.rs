@@ -1012,16 +1012,31 @@ impl<S: SpiServer> idl::InOrderSpRotImpl for ServerImpl<S> {
 
     fn attest(
         &mut self,
-        msg: &userlib::RecvMessage,
-        nonce: idol_runtime::Leased<idol_runtime::R, [u8]>,
+        _msg: &userlib::RecvMessage,
+        nonce: idol_runtime::LenLimit<
+            idol_runtime::Leased<idol_runtime::R, [u8]>,
+            MAX_BLOB_SIZE,
+        >,
         dest: idol_runtime::Leased<idol_runtime::W, [u8]>,
     ) -> Result<(), idol_runtime::RequestError<AttestOrSprotError>> where AttestOrSprotError: From<idol_runtime::ServerDeath> {
-        todo!("attest");
+        let nonce_size = u32::try_from(nonce.len()).unwrap_lite();
+        let write_size = u32::try_from(dest.len()).unwrap_lite();
+
+        let body = ReqBody::Attest(AttestReq::Attest { nonce_size, write_size });
+        let tx_size = Request::pack_with_blob(&body, self.tx_buf, nonce)?;
+
+        let rsp = self.do_send_recv_retries(tx_size, TIMEOUT_QUICK, 1)?;
+
+        if let RspBody::Ok = rsp.body? {
+            Ok(())
+        } else {
+            Err(SprotProtocolError::UnexpectedResponse)?
+        }
     }
 
     fn attest_len(
         &mut self,
-        msg: &userlib::RecvMessage,
+        _msg: &userlib::RecvMessage,
     ) -> Result<u32, idol_runtime::RequestError<AttestOrSprotError>> {
         let body = ReqBody::Attest(AttestReq::AttestLen);
         let tx_size = Request::pack(&body, self.tx_buf);

@@ -261,7 +261,7 @@ Interface(
             doc: "Get an attestation",
             args: {},
             leases: {
-                "nonce": (type: "[u8]", read: true),
+                "nonce": (type: "[u8]", read: true, max_len: Some(512)),
                 "dest": (type: "[u8]", write: true),
             },
              reply: Result(

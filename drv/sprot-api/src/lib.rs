@@ -387,7 +387,7 @@ pub enum AttestReq {
     Record { algorithm: HashAlgorithm },
     Log { offset: u32, size: u32 },
     LogLen,
-    Attest { read_size: u32, write_size: u32 },
+    Attest { nonce_size: u32, write_size: u32 },
     AttestLen,
 }
 
