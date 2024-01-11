@@ -43,11 +43,11 @@ pub struct StartupState {
 }
 
 /// Marker for data which should be copied after the packet is encoded
-pub enum TrailingData {
+pub enum TrailingData<'a> {
     Caboose { slot: SlotId, start: u32, size: u32 },
     AttestCert { index: u32, offset: u32, size: u32 },
     AttestLog { offset: u32, size: u32 },
-    Attest { nonce: [u8; 512], nonce_size: u32, write_size: u32 },
+    Attest { nonce: &'a [u8], write_size: u32 },
     RotPage { page: RotPage },
 }
 
@@ -199,7 +199,7 @@ impl Handler {
                     }
                 }
             }
-            Some(TrailingData::Attest { nonce, nonce_size, write_size }) => {
+            Some(TrailingData::Attest { nonce, write_size }) => {
                 if write_size as usize > drv_sprot_api::MAX_BLOB_SIZE {
                     Response::pack(
                         &Err(SprotError::Protocol(
@@ -209,11 +209,8 @@ impl Handler {
                     )
                 } else {
                     match Response::pack_with_cb(&rsp_body, tx_buf, |buf| {
-                        // how to get request type?
-                        // this is only made available to the `handle_request`
-                        // function :(
                         self.attest
-                            .attest(&nonce[..nonce_size as usize], &mut buf[..write_size as usize])
+                            .attest(nonce, &mut buf[..write_size as usize])
                             .map_err(|e| RspBody::Attest(Err(e)))?;
                         Ok(write_size as usize)
                     }) {
@@ -393,12 +390,10 @@ impl Handler {
             }
             ReqBody::Attest(AttestReq::Attest { nonce_size, write_size }) => {
                 let size = usize::try_from(nonce_size).unwrap_lite();
-                let mut nonce = [0u8; 512];
-                nonce[..size].copy_from_slice(&req.blob[..size]);
-
+                let nonce = &req.blob[..size];
                 Ok((
                     RspBody::Attest(Ok(AttestRsp::Attest)),
-                    Some(TrailingData::Attest { nonce, nonce_size, write_size}),
+                    Some(TrailingData::Attest { nonce, write_size}),
                 ))
             },
             ReqBody::Attest(AttestReq::AttestLen) => {
