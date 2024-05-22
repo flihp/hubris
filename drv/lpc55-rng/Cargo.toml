@@ -5,11 +5,16 @@ edition = "2021"
 
 [dependencies]
 cfg-if = { workspace = true }
+hubpack.workspace = true
 idol-runtime = { workspace = true }
+lib-dice = { path = "../../lib/dice" }
 lpc55-pac = { workspace = true }
 num-traits = { workspace = true }
 rand_chacha = { workspace = true }
 rand_core = { workspace = true }
+ringbuf = { path = "../../lib/ringbuf" }
+serde.workspace = true
+stage0-handoff = { path = "../../lib/stage0-handoff" }
 zerocopy = { workspace = true }
 
 drv-lpc55-syscon-api = { path = "../lpc55-syscon-api" }
@@ -17,7 +22,10 @@ drv-rng-api = { path = "../rng-api" }
 userlib = { path = "../../sys/userlib", features = ["panic-messages"] }
 
 [build-dependencies]
-idol = { workspace = true }
+anyhow.workspace = true
+build-util = { path = "../../build/util" }
+idol.workspace = true
+serde.workspace = true
 
 [features]
 no-ipc-counters = ["idol/no-counters"]
