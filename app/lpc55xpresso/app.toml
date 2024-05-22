@@ -118,6 +118,7 @@ uses = ["rng", "pmc"]
 start = true
 stacksize = 2200
 task-slots = ["syscon_driver"]
+extern-regions = ["dice_rng"]
 
 [tasks.pong]
 name = "task-pong"
