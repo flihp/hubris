@@ -1208,6 +1208,7 @@ dependencies = [
  "rand_core",
  "ringbuf",
  "serde",
+ "sha3",
  "stage0-handoff",
  "userlib",
  "zerocopy 0.6.6",

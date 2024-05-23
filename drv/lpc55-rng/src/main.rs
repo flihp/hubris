@@ -17,12 +17,13 @@ use drv_lpc55_syscon_api::{Peripheral, Syscon};
 use drv_rng_api::RngError;
 use hubpack::SerializedSize;
 use idol_runtime::{ClientError, NotificationHandler, RequestError};
-use lib_dice::RngData;
+use lib_dice::{RngData, RngSeed, SeedBuf};
 use rand_chacha::ChaCha20Rng;
 use rand_core::block::{BlockRng, BlockRngCore};
 use rand_core::{impls, Error, RngCore, SeedableRng};
 use ringbuf::{ringbuf, ringbuf_entry};
 use serde::Deserialize;
+use sha3::{Digest, Sha3_256};
 use stage0_handoff::{HandoffData, HandoffDataLoadError};
 use userlib::*;
 
@@ -41,7 +42,11 @@ task_slot!(SYSCON, syscon_driver);
 
 #[derive(Copy, Clone, PartialEq)]
 enum Trace {
+    FillingBytes(usize),
     HandoffError(HandoffDataLoadError),
+    Recurse(usize, usize),
+    Reseed,
+    ReseedingFill(usize),
     None,
 }
 
@@ -64,6 +69,8 @@ impl Lpc55Core {
     }
 }
 
+/// Implementing the `generate` function from the `BlockRngCore` trait gets
+/// us a free implementation of BlockRng
 impl BlockRngCore for Lpc55Core {
     type Item = u32;
     type Results = [u32; 1];
@@ -116,37 +123,78 @@ impl RngCore for Lpc55Rng {
 // low-budget rand::rngs::adapter::ReseedingRng w/o fork stuff
 struct ReseedingRng<T: SeedableRng> {
     inner: T,
-    reseeder: Lpc55Rng,
+    rng: Lpc55Rng,
     threshold: usize,
     bytes_until_reseed: usize,
 }
 
+const RNG_BYTE_COUNT: usize = 1024;
+const RNG_BUF_SIZE: usize = 32;
+
 impl<T> ReseedingRng<T>
 where
-    T: SeedableRng,
+    T: SeedableRng<Seed = [u8; 32]> + RngCore,
 {
-    fn new(mut reseeder: Lpc55Rng, threshold: usize) -> Result<Self, Error> {
+    fn new(
+        seed: RngSeed,
+        mut rng: Lpc55Rng,
+        threshold: usize,
+    ) -> Result<Self, Error> {
         use ::core::usize::MAX;
 
         let threshold = if threshold == 0 { MAX } else { threshold };
 
-        // try_trait_v2 is still experimental
-        let inner = match T::from_rng(&mut reseeder) {
-            Ok(rng) => rng,
-            Err(err) => return Err(err),
-        };
+        // mix platform unique seed drived by measured boot
+        let mut mixer = Sha3_256::new();
+        mixer.update(seed.as_bytes());
+
+        // with 1KB from hardware RNG
+        let mut bytes = [0u8; RNG_BUF_SIZE];
+        for _ in 0..(RNG_BYTE_COUNT / RNG_BUF_SIZE) {
+            rng.try_fill_bytes(&mut bytes)?;
+            mixer.update(bytes);
+        }
+
+        let inner = T::from_seed(mixer.finalize().into());
+
         Ok(ReseedingRng {
             inner,
-            reseeder,
+            rng,
             threshold,
             bytes_until_reseed: threshold,
         })
+    }
+
+    /// Reseed the inner PRNG
+    fn reseed(&mut self) -> Result<(), Error> {
+        ringbuf_entry!(Trace::Reseed);
+
+        let mut buf = [0u8; 32];
+        let mut mixer = Sha3_256::new();
+
+        // mix 32 bytes from current RNG instance
+        self.inner.try_fill_bytes(&mut buf)?;
+        mixer.update(buf);
+
+        // w/ another 1k from rng
+        for _ in 0..32 {
+            self.rng.try_fill_bytes(&mut buf)?;
+            mixer.update(buf);
+        }
+
+        // seed new RNG instance
+        self.inner = T::from_seed(mixer.finalize().into());
+
+        // reset threshold for next reseed
+        self.bytes_until_reseed = self.threshold;
+
+        Ok(())
     }
 }
 
 impl<T> RngCore for ReseedingRng<T>
 where
-    T: SeedableRng + RngCore,
+    T: SeedableRng<Seed = [u8; 32]> + RngCore,
 {
     fn next_u32(&mut self) -> u32 {
         impls::next_u32_via_fill(self)
@@ -160,25 +208,37 @@ where
     }
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
         let num_bytes = dest.len();
-        if num_bytes >= self.bytes_until_reseed || num_bytes >= self.threshold {
-            // try_trait_v2 is still experimental
-            self.inner = match T::from_rng(&mut self.reseeder) {
-                Ok(rng) => rng,
-                Err(e) => return Err(e),
-            };
-            self.bytes_until_reseed = self.threshold;
-        } else {
+        ringbuf_entry!(Trace::ReseedingFill(num_bytes));
+
+        if num_bytes < self.bytes_until_reseed {
+            // Terminal condition: we can service the request w/o reseeding.
+            ringbuf_entry!(Trace::FillingBytes(num_bytes));
             self.bytes_until_reseed -= num_bytes;
+            self.inner.try_fill_bytes(dest)
+        } else {
+            // We've been asked for bytes that exceed the reseed threshold:
+            // - fill the buffer up to the threshold
+            // - reseed
+            // - make a recursive call to fill the rest
+            ringbuf_entry!(Trace::FillingBytes(self.bytes_until_reseed));
+            self.inner
+                .try_fill_bytes(&mut dest[..self.bytes_until_reseed])?;
+            self.reseed()?;
+            ringbuf_entry!(Trace::Recurse(self.bytes_until_reseed, num_bytes));
+            self.try_fill_bytes(&mut dest[self.bytes_until_reseed..])
         }
-        self.inner.try_fill_bytes(dest)
     }
 }
 
 struct Lpc55RngServer(ReseedingRng<ChaCha20Rng>);
 
 impl Lpc55RngServer {
-    fn new(reseeder: Lpc55Rng, threshold: usize) -> Result<Self, Error> {
-        Ok(Lpc55RngServer(ReseedingRng::new(reseeder, threshold)?))
+    fn new(
+        seed: RngSeed,
+        rng: Lpc55Rng,
+        threshold: usize,
+    ) -> Result<Self, Error> {
+        Ok(Lpc55RngServer(ReseedingRng::new(seed, rng, threshold)?))
     }
 }
 
@@ -254,7 +314,8 @@ fn main() -> ! {
     rng.init();
 
     let threshold = 0x100000; // 1 MiB
-    let mut rng = Lpc55RngServer::new(rng, threshold)
+
+    let mut rng = Lpc55RngServer::new(rng_data.seed, rng, threshold)
         .expect("Failed to create Lpc55RngServer");
     let mut buffer = [0u8; idl::INCOMING_SIZE];
 
