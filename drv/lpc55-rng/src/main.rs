@@ -17,7 +17,10 @@ use drv_lpc55_syscon_api::Syscon;
 use drv_rng_api::RngError;
 use hubpack::SerializedSize;
 use idol_runtime::{ClientError, NotificationHandler, RequestError};
-use lib_dice::{RngData, RngSeed, SeedBuf};
+use lib_dice::{
+    persistid_cert_tmpl::{SUBJECT_CN_LENGTH, SUBJECT_CN_RANGE},
+    CertData, RngData, RngSeed, SeedBuf,
+};
 use lib_lpc55_rng::Lpc55Rng;
 use rand_chacha::ChaCha20Rng;
 use rand_core::{impls, Error, RngCore, SeedableRng};
@@ -34,12 +37,13 @@ mod build {
     include!(concat!(env!("OUT_DIR"), "/rng-config.rs"));
 }
 
-use build::RNG_DATA;
+use build::{CERT_DATA, RNG_DATA};
 
 task_slot!(SYSCON, syscon_driver);
 
 #[derive(Copy, Clone, PartialEq)]
 enum Trace {
+    Sn([u8; SUBJECT_CN_LENGTH]),
     FillingBytes(usize),
     HandoffError(HandoffDataLoadError),
     Recurse(usize, usize),
@@ -70,6 +74,7 @@ where
     fn new(
         seed: RngSeed,
         mut rng: R,
+        sn: &[u8; SUBJECT_CN_LENGTH],
         threshold: usize,
     ) -> Result<Self, Error> {
         use ::core::usize::MAX;
@@ -79,6 +84,9 @@ where
         // mix platform unique seed drived by measured boot
         let mut mixer = Sha3_256::default();
         mixer.update(seed.as_bytes());
+
+        // mix in unique platform id
+        mixer.update(sn);
 
         // with 1KB from hardware RNG
         // NOTE: This is slow AF now that we're waiting for the online
@@ -176,9 +184,10 @@ impl Lpc55RngServer {
     fn new(
         seed: RngSeed,
         rng: Lpc55Rng,
+        sn: &[u8; SUBJECT_CN_LENGTH],
         threshold: usize,
     ) -> Result<Self, Error> {
-        Ok(Lpc55RngServer(ReseedingRng::new(seed, rng, threshold)?))
+        Ok(Self(ReseedingRng::new(seed, rng, sn, threshold)?))
     }
 }
 
@@ -244,6 +253,14 @@ fn load_data_from_region<
 #[export_name = "main"]
 fn main() -> ! {
     let rng_data: RngData = load_data_from_region(&RNG_DATA).unwrap_lite();
+    // get cert data from handoff region
+    let cert_data: CertData = load_data_from_region(&CERT_DATA).unwrap_lite();
+    // get subject 'CN' from PersistIdCert 'Subject'
+    let sn_bytes: [u8; SUBJECT_CN_LENGTH] =
+        cert_data.persistid_cert.0.as_bytes()[SUBJECT_CN_RANGE]
+            .try_into()
+            .expect("fml");
+    ringbuf_entry!(Trace::Sn(sn_bytes));
 
     let rng = Lpc55Rng::new();
     rng.init(&Syscon::from(SYSCON.get_task_id()))
@@ -251,7 +268,7 @@ fn main() -> ! {
 
     let threshold = 0x100000; // 1 MiB
 
-    let mut rng = Lpc55RngServer::new(rng_data.seed, rng, threshold)
+    let mut rng = Lpc55RngServer::new(rng_data.seed, rng, &sn_bytes, threshold)
         .expect("Failed to create Lpc55RngServer");
     let mut buffer = [0u8; idl::INCOMING_SIZE];
 

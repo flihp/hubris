@@ -35,12 +35,25 @@ fn main() -> Result<()> {
     }
 
     let region = data_regions
+        .get("dice_certs")
+        .ok_or_else(|| anyhow::anyhow!("dice_certs data region not found"))?;
+    writeln!(out, "use crate::config::DataRegion;\n\n")?;
+
+    writeln!(
+        out,
+        r##"pub const CERT_DATA: DataRegion = DataRegion {{
+    address: {:#x},
+    size: {:#x},
+}};"##,
+        region.address, region.size
+    )?;
+
+    let region = data_regions
         .get("dice_rng")
         .ok_or_else(|| anyhow!("dice_rng data region not found"))?;
     writeln!(
         out,
-        r##"use crate::config::DataRegion;
-pub const RNG_DATA: DataRegion = DataRegion {{
+        r##"pub const RNG_DATA: DataRegion = DataRegion {{
     address: {:#x},
     size: {:#x},
 }};"##,
