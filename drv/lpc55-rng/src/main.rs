@@ -17,7 +17,10 @@ use drv_lpc55_syscon_api::Syscon;
 use drv_rng_api::RngError;
 use hubpack::SerializedSize;
 use idol_runtime::{ClientError, NotificationHandler, RequestError};
-use lib_dice::{RngData, RngSeed, SeedBuf};
+use lib_dice::{
+    persistid_cert_tmpl::{SUBJECT_CN_LENGTH, SUBJECT_CN_RANGE},
+    CertData, RngData, RngSeed, SeedBuf,
+};
 use lib_lpc55_rng::Lpc55Rng;
 use rand_chacha::ChaCha20Rng;
 use rand_core::{impls, Error, RngCore, SeedableRng};
@@ -39,7 +42,7 @@ mod build {
     include!(concat!(env!("OUT_DIR"), "/rng-config.rs"));
 }
 
-use build::RNG_DATA;
+use build::{CERT_DATA, RNG_DATA};
 
 task_slot!(SYSCON, syscon_driver);
 
@@ -70,6 +73,7 @@ where
     fn new(
         seed: RngSeed,
         mut reseeder: R,
+        pid: &[u8],
         threshold: usize,
     ) -> Result<Self, Error> {
         let threshold = if threshold == 0 {
@@ -81,6 +85,9 @@ where
         let mut mixer = H::default();
         // mix platform unique seed drived by measured boot
         Digest::update(&mut mixer, seed.as_bytes());
+
+        // mix in unique platform id
+        Digest::update(&mut mixer, pid);
 
         // w/ 32 bytes from HRNG
         let mut buf = Zeroizing::new(T::Seed::default());
@@ -160,10 +167,11 @@ impl Lpc55RngServer {
     fn new(
         seed: RngSeed,
         reseeder: Lpc55Rng,
+        pid: &[u8],
         threshold: usize,
     ) -> Result<Self, Error> {
         Ok(Lpc55RngServer(ReseedingRng::new(
-            seed, reseeder, threshold,
+            seed, reseeder, pid, threshold,
         )?))
     }
 }
@@ -234,10 +242,18 @@ fn main() -> ! {
             .unwrap_lite()
             .seed
     };
+    let pid: [u8; SUBJECT_CN_LENGTH] = {
+        let cert_data: CertData =
+            load_data_from_region(&CERT_DATA).unwrap_lite();
+        cert_data.persistid_cert.0.as_bytes()[SUBJECT_CN_RANGE]
+            .try_into()
+            .unwrap_lite()
+    };
+
     let rng = Lpc55Rng::new(&Syscon::from(SYSCON.get_task_id()));
 
     let threshold = 0x100000; // 1 MiB
-    let mut rng = Lpc55RngServer::new(seed, rng, threshold)
+    let mut rng = Lpc55RngServer::new(seed, rng, &pid, threshold)
         .expect("Failed to create Lpc55RngServer");
     let mut buffer = [0u8; idl::INCOMING_SIZE];
 
