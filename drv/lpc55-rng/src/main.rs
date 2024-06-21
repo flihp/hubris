@@ -86,12 +86,16 @@ impl BlockRngCore for Lpc55Core {
 
 struct Lpc55Rng(BlockRng<Lpc55Core>);
 
+const INIT_RETRY_MAX: u8 = 5;
+const INIT_SLEEP_TICKS: u64 = 200;
+
 impl Lpc55Rng {
     fn new() -> Self {
         Lpc55Rng(BlockRng::new(Lpc55Core::new()))
     }
 
-    fn init(&self) {
+    /// power on, enable clock, and reset RNG per UM11126 v2.4 §48.15.5 step 1
+    fn poweron_reset(&self) {
         self.0
             .core
             .pmc
@@ -102,6 +106,95 @@ impl Lpc55Rng {
 
         self.0.core.syscon.enter_reset(Peripheral::Rng);
         self.0.core.syscon.leave_reset(Peripheral::Rng);
+    }
+
+    /// select the clock used in chi^2 computation per UM11126 v2.4 §48.15.5 step 2
+    // manual states that Revision 1B hardware should use clock 4
+    fn enable_1b_chi_clock(&self) {
+        self.0
+            .core
+            .rng
+            .counter_cfg
+            .modify(|_, w| unsafe { w.clock_sel().bits(4) })
+    }
+
+
+    /// Disable online RNG / chi^2 test
+    fn disable_online_test(&self) {
+        self.0
+            .core
+            .rng
+            .online_test_cfg
+            .modify(|_, w| w.activate().clear_bit())
+    }
+
+    /// Enable online RNG / chi^2 test
+    fn enable_online_test(&self) {
+        self.0
+            .core
+            .rng
+            .online_test_cfg
+            .modify(|_, w| w.activate().set_bit())
+    }
+
+    fn min_chi_squared(&self) -> u8 {
+        self.0
+            .core
+            .rng
+            .online_test_val
+            .read()
+            .min_chi_squared()
+            .bits()
+    }
+
+    fn max_chi_squared(&self) -> u8 {
+        self.0
+            .core
+            .rng
+            .online_test_val
+            .read()
+            .max_chi_squared()
+            .bits()
+    }
+    /// Initialize the hardware RNG per UM11126 v2.4 §48.15.5
+    fn init(&self) -> Result<(), RngError> {
+        self.poweron_reset();
+
+        // Enable entropy accumulation test per instructions in step 2
+        // for Revision 1B hardware (the only we support).
+        let mut retry = 0;
+        loop {
+            self.enable_1b_chi_clock();
+            self.enable_online_test();
+            // Wait for MAX_CHI_SQUARED > MIN_CHI_SQUARED per step 3
+            let mut retry_chi_min = 0;
+            while self.min_chi_squared() >= self.max_chi_squared() {
+                if retry_chi_min < INIT_RETRY_MAX {
+                    retry_chi_min += 1;
+                    hl::sleep_for(INIT_SLEEP_TICKS);
+                } else {
+                    return Err(RngError::TimeoutChi2Min);
+                }
+            }
+
+            // This is step 4. Not sure how to describe it / what to call it.
+            if self.max_chi_squared() > 4 {
+                self.disable_online_test()
+                if self.0.core.rng.counter_cfg.read().shift4x().bits() < 7 {
+                    self.0.core.rng.counter_cfg.modify(|r, w| unsafe {
+                        w.shift4x().bits(r.shift4x().bits() + 1)
+                    });
+                }
+                if retry < INIT_RETRY_MAX {
+                    hl::sleep_for(INIT_SLEEP_TICKS);
+                    retry += 1;
+                } else {
+                    return Err(RngError::TimeoutChi2Gt4);
+                }
+            } else {
+                break Ok(());
+            }
+        }
     }
 }
 
@@ -328,7 +421,7 @@ fn main() -> ! {
     ringbuf_entry!(Trace::Sn(sn_bytes));
 
     let rng = Lpc55Rng::new();
-    rng.init();
+    rng.init().expect("Failed to initialize Lpc55RngServer");
 
     let threshold = 0x100000; // 1 MiB
 
