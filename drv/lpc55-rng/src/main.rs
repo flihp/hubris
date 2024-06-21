@@ -51,6 +51,7 @@ enum Trace {
     Recurse(usize, usize),
     Reseed,
     ReseedingFill(usize),
+    RngError(RngError),
     None,
 }
 
@@ -73,21 +74,62 @@ impl Lpc55Core {
     }
 }
 
+const CHECK_RETRY_MAX: u8 = 5;
+// # of ticks in ~1ms @ 96MHz
+const CHECK_SLEEP_TICKS: u64 = 96_000;
+
 /// Implementing the `generate` function from the `BlockRngCore` trait gets
 /// us a free implementation of BlockRng
 impl BlockRngCore for Lpc55Core {
     type Item = u32;
     type Results = [u32; 1];
 
+    /// Read 4 bytes from the hardware RNG per UM11126 v2.4 §48.15.6
     fn generate(&mut self, results: &mut Self::Results) {
+        if self.pmc.pdruncfg0.read().pden_rng().is_poweredoff() {
+            ringbuf_entry!(Trace::RngError(RngError::PoweredOff));
+            panic!();
+        }
+
+        // 1. Keep Clocks CHI computing active.
+        // 2. Wait for COUNTER_VAL.REFRESH_CNT to become 31 to refill fresh entropy
+        //    since last reading of a random number.
+        let mut retry = 0;
+        while self.rng.counter_val.read().refresh_cnt().bits() != 31 {
+            if retry < CHECK_RETRY_MAX {
+                hl::sleep_for(CHECK_SLEEP_TICKS);
+                retry += 1;
+            } else {
+                ringbuf_entry!(Trace::RngError(RngError::CheckRefreshNot31));
+                panic!();
+            }
+        }
+        // 3. Read new Random number by reading RANDOM_NUMBER register. This will
+        //    reset COUNTER_VAL.REFRESH_CNT to zero.
         results[0] = self.rng.random_number.read().bits();
+        // 4. Perform online CHI computing check by checking
+        //    ONLINE_TEST_VAL.MAX_CHI_SQUARED value. Wait till
+        //    ONLINE_TEST_VAL.MAX_CHI_SQUARED becomes smaller or equal than 4.
+        retry = 0;
+        while self.rng.online_test_val.read().max_chi_squared().bits() > 4 {
+            if retry < CHECK_RETRY_MAX {
+                hl::sleep_for(1);
+                retry += 1;
+            } else {
+                ringbuf_entry!(Trace::RngError(RngError::CheckMaxTooSmall));
+                panic!();
+            }
+        }
+        // 5. Go to step 2 and read new random number.
+        // NOTE: calling this function again is equivalent to 'go to step 2'
     }
 }
 
 struct Lpc55Rng(BlockRng<Lpc55Core>);
 
 const INIT_RETRY_MAX: u8 = 5;
-const INIT_SLEEP_TICKS: u64 = 200;
+// # of ticks in ~1ms @ 96MHz
+const INIT_SLEEP_TICKS: u64 = 96_000;
 
 impl Lpc55Rng {
     fn new() -> Self {
@@ -109,7 +151,6 @@ impl Lpc55Rng {
     }
 
     /// select the clock used in chi^2 computation per UM11126 v2.4 §48.15.5 step 2
-    // manual states that Revision 1B hardware should use clock 4
     fn enable_1b_chi_clock(&self) {
         self.0
             .core
@@ -119,7 +160,7 @@ impl Lpc55Rng {
     }
 
 
-    /// Disable online RNG / chi^2 test
+    /// Disable RNG online / chi^2 test
     fn disable_online_test(&self) {
         self.0
             .core
@@ -128,7 +169,7 @@ impl Lpc55Rng {
             .modify(|_, w| w.activate().clear_bit())
     }
 
-    /// Enable online RNG / chi^2 test
+    /// Enable RNG online / chi^2 test
     fn enable_online_test(&self) {
         self.0
             .core
@@ -137,6 +178,7 @@ impl Lpc55Rng {
             .modify(|_, w| w.activate().set_bit())
     }
 
+    /// Read ONLINE_TEST_VAL.MIN_CHI_SQUARED
     fn min_chi_squared(&self) -> u8 {
         self.0
             .core
@@ -147,6 +189,7 @@ impl Lpc55Rng {
             .bits()
     }
 
+    /// Read ONLINE_TEST_VAL.MAX_CHI_SQUARED
     fn max_chi_squared(&self) -> u8 {
         self.0
             .core
@@ -156,16 +199,18 @@ impl Lpc55Rng {
             .max_chi_squared()
             .bits()
     }
-    /// Initialize the hardware RNG per UM11126 v2.4 §48.15.5
+
+    /// Enable & initialize the hardware RNG per UM11126 v2.4 §48.15.5
     fn init(&self) -> Result<(), RngError> {
         self.poweron_reset();
 
-        // Enable entropy accumulation test per instructions in step 2
-        // for Revision 1B hardware (the only we support).
         let mut retry = 0;
         loop {
+            // Enable entropy accumulation test per instructions in step 2
+            // for Revision 1B hardware (the only we support).
             self.enable_1b_chi_clock();
             self.enable_online_test();
+
             // Wait for MAX_CHI_SQUARED > MIN_CHI_SQUARED per step 3
             let mut retry_chi_min = 0;
             while self.min_chi_squared() >= self.max_chi_squared() {
@@ -173,14 +218,18 @@ impl Lpc55Rng {
                     retry_chi_min += 1;
                     hl::sleep_for(INIT_SLEEP_TICKS);
                 } else {
-                    return Err(RngError::TimeoutChi2Min);
+                    ringbuf_entry!(Trace::RngError(RngError::CheckMinGtMax));
+                    return Err(RngError::CheckMinGtMax);
                 }
             }
 
-            // This is step 4. Not sure how to describe it / what to call it.
+            // The final condition & remediation (tuning?) in step 4.
             if self.max_chi_squared() > 4 {
-                self.disable_online_test()
+                self.disable_online_test();
                 if self.0.core.rng.counter_cfg.read().shift4x().bits() < 7 {
+                    // SAFETY: The pac crate doesn't guarantee that the value
+                    // we write to the register here is valid. This is a set
+                    // of instructions from the manual so we assume it is.
                     self.0.core.rng.counter_cfg.modify(|r, w| unsafe {
                         w.shift4x().bits(r.shift4x().bits() + 1)
                     });
@@ -189,7 +238,8 @@ impl Lpc55Rng {
                     hl::sleep_for(INIT_SLEEP_TICKS);
                     retry += 1;
                 } else {
-                    return Err(RngError::TimeoutChi2Gt4);
+                    ringbuf_entry!(Trace::RngError(RngError::CheckMaxTooSmall));
+                    return Err(RngError::CheckMaxTooSmall);
                 }
             } else {
                 break Ok(());
@@ -421,7 +471,7 @@ fn main() -> ! {
     ringbuf_entry!(Trace::Sn(sn_bytes));
 
     let rng = Lpc55Rng::new();
-    rng.init().expect("Failed to initialize Lpc55RngServer");
+    rng.init().expect("Initialization failed");
 
     let threshold = 0x100000; // 1 MiB
 

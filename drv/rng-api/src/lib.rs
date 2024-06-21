@@ -20,8 +20,9 @@ pub enum RngError {
     PoweredOff = 1,
     NoData,
     ClockError,
-    TimeoutChi2Gt4,
-    TimeoutChi2Min,
+    CheckMinGtMax,
+    CheckMaxTooSmall,
+    CheckRefreshNot31,
     SeedError,
     UnknownRngError,
 
