@@ -2917,6 +2917,7 @@ dependencies = [
  "drv-rng-api",
  "lpc55-pac",
  "rand_core",
+ "userlib",
 ]
 
 [[package]]

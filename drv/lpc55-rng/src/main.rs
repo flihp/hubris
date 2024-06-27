@@ -250,7 +250,9 @@ fn main() -> ! {
             .unwrap_lite()
     };
 
-    let rng = Lpc55Rng::new(&Syscon::from(SYSCON.get_task_id()));
+    let rng = Lpc55Rng::new();
+    rng.init(&Syscon::from(SYSCON.get_task_id()))
+        .expect("Lpc55Rng::init failed");
 
     let threshold = 0x100000; // 1 MiB
     let mut rng = Lpc55RngServer::new(seed, rng, &pid, threshold)
