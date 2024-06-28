@@ -14,8 +14,26 @@ use userlib::hl;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Lpc55RngError {
+    MaxChi2Gt4,
+    PoweredOff,
+    RefreshCntNot31,
     TimeoutChi2Min,
     TimeoutChi2Gt4,
+}
+
+// This transform is a 1-way street and we lose information mapping from
+// the two possible errors that the Lpc55Rng can produce when insufficient
+// entropy is available.
+impl From<Lpc55RngError> for RngError {
+    fn from(e: Lpc55RngError) -> RngError {
+        match e {
+            Lpc55RngError::MaxChi2Gt4 | Lpc55RngError::RefreshCntNot31 => {
+                RngError::NoEntropy
+            }
+            Lpc55RngError::PoweredOff => RngError::PoweredOff,
+            _ => RngError::UnknownRngError,
+        }
+    }
 }
 
 pub struct Lpc55Rng {
@@ -25,6 +43,9 @@ pub struct Lpc55Rng {
 
 const INIT_RETRY_MAX: u8 = 5;
 const INIT_SLEEP_TICKS: u64 = 200;
+
+const CHECK_RETRY_MAX: u8 = 5;
+const CHECK_SLEEP_TICKS: u64 = 500;
 
 #[repr(u8)]
 #[allow(dead_code)]
@@ -138,6 +159,48 @@ impl Lpc55Rng {
         }
     }
 
+    /// Read 4 bytes from the hardware RNG per UM11126 v2.4 §48.15.6
+    pub fn read(&self) -> Result<u32, Lpc55RngError> {
+        if self.pmc.pdruncfg0.read().pden_rng().is_poweredoff() {
+            return Err(Lpc55RngError::PoweredOff);
+        }
+
+        // 1. Keep Clocks CHI computing active.
+        // 2. Wait for COUNTER_VAL.REFRESH_CNT to become 31 to refill fresh entropy
+        //    since last reading of a random number.
+        let mut retry = 0;
+        while self.refresh_count() != 31 {
+            if retry < CHECK_RETRY_MAX {
+                hl::sleep_for(CHECK_SLEEP_TICKS);
+                retry += 1;
+            } else {
+                return Err(Lpc55RngError::RefreshCntNot31);
+            }
+        }
+        // 3. Read new Random number by reading RANDOM_NUMBER register. This will
+        //    reset COUNTER_VAL.REFRESH_CNT to zero.
+        let out = self.rng.random_number.read().bits();
+
+        // 4. Perform online CHI computing check by checking
+        //    ONLINE_TEST_VAL.MAX_CHI_SQUARED value. Wait till
+        //    ONLINE_TEST_VAL.MAX_CHI_SQUARED becomes smaller or equal than 4.
+        // NOTE: We've already read the output from the RNG, not sure why
+        // we're waiting for this when we could just check it first next time
+        // around? Move this between step 1 & 2 above?
+        retry = 0;
+        while self.max_chi_squared() > 4 {
+            if retry < CHECK_RETRY_MAX {
+                hl::sleep_for(CHECK_SLEEP_TICKS);
+                retry += 1;
+            } else {
+                return Err(Lpc55RngError::MaxChi2Gt4);
+            }
+        }
+        // 5. Go to step 2 and read new random number.
+        // NOTE: calling this function again is equivalent to 'go to step 2'
+        Ok(out)
+    }
+
     #[inline]
     fn poweron_reset(&self, syscon: &Syscon) {
         self.pmc.pdruncfg0.modify(|_, w| w.pden_rng().poweredoff());
@@ -209,6 +272,11 @@ impl Lpc55Rng {
             });
         }
     }
+
+    #[inline]
+    fn refresh_count(&self) -> u8 {
+        self.rng.counter_val.read().refresh_cnt().bits()
+    }
 }
 
 impl RngCore for Lpc55Rng {
@@ -232,11 +300,7 @@ impl RngCore for Lpc55Rng {
     fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Error> {
         let mut filled = 0;
         while filled < dst.len() {
-            if self.pmc.pdruncfg0.read().pden_rng().bits() {
-                return Err(RngError::PoweredOff.into());
-            }
-
-            let src = self.rng.random_number.read().bits();
+            let src = self.read().map_err(RngError::from)?;
             let len = cmp::min(mem::size_of_val(&src), dst[filled..].len());
 
             dst[filled..filled + len]
