@@ -10,7 +10,17 @@ use drv_lpc55_syscon_api::{Peripheral, Syscon};
 use drv_rng_api::RngError;
 use lpc55_pac::{pmc, rng, PMC, RNG};
 use rand_core::{impls, Error, RngCore};
+use ringbuf::*;
 use userlib::hl;
+
+#[derive(Copy, Clone, PartialEq)]
+enum Trace {
+    Error(Lpc55RngError),
+    RandBytes([u8; 4]),
+    None,
+}
+
+ringbuf!(Trace, 16, Trace::None);
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Lpc55RngError {
@@ -145,7 +155,9 @@ impl Lpc55Rng {
                     retry_min_max += 1;
                     hl::sleep_for(INIT_SLEEP_TICKS);
                 } else {
-                    return Err(Lpc55RngError::CheckEnableTimeout);
+                    let e = Lpc55RngError::CheckEnableTimeout;
+                    ringbuf_entry!(Trace::Error(e));
+                    return Err(e);
                 }
             }
 
@@ -159,7 +171,9 @@ impl Lpc55Rng {
                     hl::sleep_for(INIT_SLEEP_TICKS);
                     retry += 1;
                 } else {
-                    return Err(Lpc55RngError::CheckTuneTimeout);
+                    let e = Lpc55RngError::CheckTuneTimeout;
+                    ringbuf_entry!(Trace::Error(e));
+                    return Err(e);
                 }
             } else {
                 break Ok(());
@@ -170,7 +184,9 @@ impl Lpc55Rng {
     /// Read 4 bytes from the hardware RNG per UM11126 v2.4 §48.15.6
     pub fn read(&self) -> Result<u32, Lpc55RngError> {
         if self.pmc.pdruncfg0.read().pden_rng().is_poweredoff() {
-            return Err(Lpc55RngError::PoweredOff);
+            let e = Lpc55RngError::PoweredOff;
+            ringbuf_entry!(Trace::Error(e));
+            return Err(e);
         }
 
         // Step 1 reminds us to not disable the clock for the online test.
@@ -181,12 +197,15 @@ impl Lpc55Rng {
                 hl::sleep_for(CHECK_SLEEP_TICKS);
                 retry += 1;
             } else {
-                return Err(Lpc55RngError::NoEntropy);
+                let e = Lpc55RngError::NoEntropy;
+                ringbuf_entry!(Trace::Error(e));
+                return Err(e);
             }
         }
         // Read RANDOM_NUMBER register to get 4 bytes from HRNG per step 3.
         // This will reset COUNTER_VAL.REFRESH_CNT to zero.
         let out = self.rng.random_number.read().bits();
+        ringbuf_entry!(Trace::RandBytes(out.to_le_bytes()));
 
         // Wait till ONLINE_TEST_VAL.MAX_CHI_SQUARED becomes smaller or equal
         // than 4 per step 4.
@@ -199,7 +218,9 @@ impl Lpc55Rng {
                 hl::sleep_for(CHECK_SLEEP_TICKS);
                 retry += 1;
             } else {
-                return Err(Lpc55RngError::TestFail);
+                let e = Lpc55RngError::TestFail;
+                ringbuf_entry!(Trace::Error(e));
+                return Err(e);
             }
         }
 

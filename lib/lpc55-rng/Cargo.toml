@@ -9,6 +9,7 @@ rand_core.workspace = true
 
 drv-lpc55-syscon-api.path = "../../drv/lpc55-syscon-api"
 drv-rng-api.path = "../../drv/rng-api"
+ringbuf.path = "../ringbuf"
 userlib.path = "../../sys/userlib"
 
 [lib]
