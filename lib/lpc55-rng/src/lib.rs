@@ -10,7 +10,17 @@ use drv_lpc55_syscon_api::{Peripheral, Syscon};
 use drv_rng_api::RngError;
 use lpc55_pac::{pmc, rng, PMC, RNG};
 use rand_core::{impls, Error, RngCore};
+use ringbuf::*;
 use userlib::hl;
+
+#[derive(Copy, Clone, PartialEq)]
+enum Trace {
+    Error(Lpc55RngError),
+    RandBytes([u8; 4]),
+    None,
+}
+
+ringbuf!(Trace, 16, Trace::None);
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Lpc55RngError {
@@ -139,7 +149,9 @@ impl Lpc55Rng {
                     retry_chi_min += 1;
                     hl::sleep_for(INIT_SLEEP_TICKS);
                 } else {
-                    return Err(Lpc55RngError::TimeoutChi2Min);
+                    let e = Lpc55RngError::TimeoutChi2Min;
+                    ringbuf_entry!(Trace::Error(e));
+                    return Err(e);
                 }
             }
 
@@ -151,7 +163,9 @@ impl Lpc55Rng {
                     hl::sleep_for(INIT_SLEEP_TICKS);
                     retry += 1;
                 } else {
-                    return Err(Lpc55RngError::TimeoutChi2Gt4);
+                    let e = Lpc55RngError::TimeoutChi2Gt4;
+                    ringbuf_entry!(Trace::Error(e));
+                    return Err(e);
                 }
             } else {
                 break Ok(());
@@ -162,7 +176,9 @@ impl Lpc55Rng {
     /// Read 4 bytes from the hardware RNG per UM11126 v2.4 §48.15.6
     pub fn read(&self) -> Result<u32, Lpc55RngError> {
         if self.pmc.pdruncfg0.read().pden_rng().is_poweredoff() {
-            return Err(Lpc55RngError::PoweredOff);
+            let e = Lpc55RngError::PoweredOff;
+            ringbuf_entry!(Trace::Error(e));
+            return Err(e);
         }
 
         // 1. Keep Clocks CHI computing active.
@@ -174,12 +190,15 @@ impl Lpc55Rng {
                 hl::sleep_for(CHECK_SLEEP_TICKS);
                 retry += 1;
             } else {
-                return Err(Lpc55RngError::RefreshCntNot31);
+                let e = Lpc55RngError::RefreshCntNot31;
+                ringbuf_entry!(Trace::Error(e));
+                return Err(e);
             }
         }
         // 3. Read new Random number by reading RANDOM_NUMBER register. This will
         //    reset COUNTER_VAL.REFRESH_CNT to zero.
         let out = self.rng.random_number.read().bits();
+        ringbuf_entry!(Trace::RandBytes(out.to_le_bytes()));
 
         // 4. Perform online CHI computing check by checking
         //    ONLINE_TEST_VAL.MAX_CHI_SQUARED value. Wait till
@@ -193,7 +212,9 @@ impl Lpc55Rng {
                 hl::sleep_for(CHECK_SLEEP_TICKS);
                 retry += 1;
             } else {
-                return Err(Lpc55RngError::MaxChi2Gt4);
+                let e = Lpc55RngError::MaxChi2Gt4;
+                ringbuf_entry!(Trace::Error(e));
+                return Err(e);
             }
         }
         // 5. Go to step 2 and read new random number.
