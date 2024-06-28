@@ -22,6 +22,7 @@ pub enum RngError {
     ClockError,
     SeedError,
     UnknownRngError,
+    NoEntropy,
 
     #[idol(server_death)]
     ServerRestarted,
