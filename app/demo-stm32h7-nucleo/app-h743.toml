@@ -156,7 +156,6 @@ extern-regions = [ "sram2", "sram3", "sram4" ]
 
 [tasks.fmc_demo]
 name = "drv-stm32h7-fmc-demo-server"
-features = ["h743"]
 priority = 4
 start = true
 task-slots = ["sys"]
