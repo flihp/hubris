@@ -72,6 +72,7 @@ struct ReseedingRng<T: SeedableRng, R: RngCore, H: Digest> {
     threshold: usize,
     bytes_until_reseed: usize,
     mixer: H,
+    output: [u8; 32],
 }
 
 impl<T, R, H> ReseedingRng<T, R, H>
@@ -79,7 +80,7 @@ where
     T: SeedableRng<Seed = [u8; 32]> + RngCore,
     R: RngCore,
     H: FixedOutputReset + Default + Digest,
-    [u8; 32]: From<GenericArray<u8, <H as OutputSizeUser>::OutputSize>>,
+    GenericArray<u8, <H as OutputSizeUser>::OutputSize>: From<[u8; 32]>,
 {
     fn new(
         seed: Option<&RngSeed>,
@@ -110,7 +111,9 @@ where
         Digest::update(&mut mixer, buf.as_ref());
 
         // create initial instance of the SeedableRng from the seed
-        let inner = T::from_seed(mixer.finalize_fixed_reset().into());
+        let output = [0u8; 32];
+        Digest::finalize_into_reset(&mut mixer, &mut output.into());
+        let inner = T::from_seed(output.into());
 
         Ok(ReseedingRng {
             inner,
@@ -118,6 +121,7 @@ where
             threshold,
             bytes_until_reseed: threshold,
             mixer,
+            output,
         })
     }
 }
@@ -127,7 +131,7 @@ where
     T: SeedableRng<Seed = [u8; 32]> + RngCore,
     R: RngCore,
     H: FixedOutputReset + Default + Digest,
-    [u8; 32]: From<GenericArray<u8, <H as OutputSizeUser>::OutputSize>>,
+    GenericArray<u8, <H as OutputSizeUser>::OutputSize>: From<[u8; 32]>,
 {
     fn next_u32(&mut self) -> u32 {
         impls::next_u32_via_fill(self)
@@ -164,8 +168,11 @@ where
                 Digest::update(&mut self.mixer, buf.as_mut());
 
                 // seed new RNG instance & reset mixer
-                self.inner =
-                    T::from_seed(self.mixer.finalize_fixed_reset().into());
+                Digest::finalize_into_reset(
+                    &mut self.mixer,
+                    &mut self.output.into(),
+                );
+                self.inner = T::from_seed(self.output.into());
 
                 // reset reseed countdown
                 self.bytes_until_reseed = self.threshold;
